@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flotorch-eval"
+version = "0.1.0"
+description = "A comprehensive evaluation framework for AI systems"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["ai", "evaluation", "agents", "models", "opentelemetry", "ragas"]
+authors = [
+    { name = "Nanda Rajashekaruni", email = "nanda@flotorch.ai" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.7.0",
+]
+
+[project.optional-dependencies]
+agent = [
+    "opentelemetry-api>=1.0.0",
+    "opentelemetry-sdk>=1.0.0",
+    "ragas>=0.0.20",
+    "langchain>=0.1.0",
+    "agentevals>=0.0.8",
+]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.0.0",
+    "flake8>=4.0.0",
+    "pytest-asyncio>=0.14.0",
+    "pytest-cov>=2.0.0",
+]
+all = ["flotorch-eval[agent,dev]"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--asyncio-mode=auto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flotorch_eval"] 
