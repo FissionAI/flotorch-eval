@@ -44,19 +44,125 @@ class TraceConverter:
             internal_spans.append(internal_span)
 
         messages: List[Message] = []
-        current_tool_calls = []
-        pending_tool_messages = (
-            []
-        )  # Store tool messages until we have an assistant message
-        final_answer_added = False
+        current_tool_calls = []  # Track all tool calls for matching with outputs
+        pending_tool_messages = []  # Store tool messages until their assistant message
         has_assistant_message = False
 
         # Process spans to build the conversation
         for span in internal_spans:
-            if span.name.startswith("chat") or span.attributes.get(
+            if span.name.startswith("Model invoke"):
+                # Handle Strands format
+                prompt = span.attributes.get("gen_ai.prompt")
+                completion = span.attributes.get("gen_ai.completion")
+
+                if prompt:
+                    try:
+                        prompt_data = json.loads(prompt)
+                        if isinstance(prompt_data, list) and len(prompt_data) > 0:
+                            user_msg = prompt_data[0]
+                            if user_msg.get("role") == "user" and not any(m.role == "user" for m in messages):
+                                content = user_msg.get("content", [])
+                                if isinstance(content, list) and len(content) > 0:
+                                    user_content = content[0].get("text", "")
+                                    messages.append(
+                                        Message(
+                                            role="user",
+                                            content=user_content,
+                                            timestamp=span.start_time,
+                                            tool_calls=[],
+                                        )
+                                    )
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+
+                if completion:
+                    try:
+                        completion_data = json.loads(completion)
+                        if isinstance(completion_data, list):
+                            thought = None
+                            tool_calls = []
+                            
+                            for item in completion_data:
+                                if isinstance(item, dict):
+                                    if "text" in item:
+                                        thought = item["text"]
+                                    elif "toolUse" in item:
+                                        tool_use = item["toolUse"]
+                                        tool_calls.append(
+                                            ToolCall(
+                                                name=tool_use.get("name", ""),
+                                                arguments=tool_use.get("input", {}),
+                                                timestamp=span.start_time,
+                                                output=None
+                                            )
+                                        )
+                            
+                            if thought or tool_calls:
+                                messages.append(
+                                    Message(
+                                        role="assistant",
+                                        content=thought or "",
+                                        timestamp=span.start_time,
+                                        tool_calls=tool_calls,
+                                    )
+                                )
+                                current_tool_calls.extend(tool_calls)
+                                has_assistant_message = True
+
+                                # Add any pending tool messages now that we have an assistant message
+                                if pending_tool_messages:
+                                    messages.extend(pending_tool_messages)
+                                    pending_tool_messages = []
+
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+
+            elif span.name.startswith("Tool:"):
+                # Handle Strands tool format
+                tool_name = span.name.replace("Tool: ", "")
+                tool_result = span.attributes.get("tool.result")
+                
+                if tool_result:
+                    try:
+                        result_data = json.loads(tool_result)
+                        if isinstance(result_data, list):
+                            # Combine all text parts
+                            tool_output_parts = []
+                            for item in result_data:
+                                if isinstance(item, dict) and "text" in item:
+                                    text = item.get("text", "").strip()
+                                    if text:
+                                        tool_output_parts.append(text)
+                            
+                            tool_output = "\n".join(tool_output_parts)
+                            
+                            if tool_output:
+                                tool_message = Message(
+                                    role="tool",
+                                    content=tool_output,
+                                    timestamp=span.end_time,
+                                    tool_calls=[],
+                                )
+
+                                # Update the corresponding tool call with the output
+                                for tool_call in current_tool_calls:
+                                    if tool_call.name == tool_name:
+                                        tool_call.output = tool_output
+                                        break
+
+                                # Add message immediately if we have an assistant message, otherwise store it
+                                if has_assistant_message:
+                                    messages.append(tool_message)
+                                else:
+                                    pending_tool_messages.append(tool_message)
+
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+
+            elif span.name.startswith("chat") or span.attributes.get(
                 "gen_ai.operation.name"
             ) in ["chat", "completion"]:
-                # Process LLM interaction span
+                # Handle CrewAI format
                 prompt = self._extract_prompt_from_events(span)
                 completion = self._extract_completion_from_events(span)
 
@@ -76,53 +182,31 @@ class TraceConverter:
                     tool_calls, thought = self._parse_assistant_output(
                         completion, span.start_time
                     )
-                    if thought:
-                        # Check if this is a final answer
-                        if "Final Answer:" in completion:
-                            if not final_answer_added:
-                                final_answer = completion.split("Final Answer:", 1)[
-                                    1
-                                ].strip()
-                                # Remove any trailing JSON artifacts
-                                final_answer = final_answer.rstrip('"}')
-                                messages.append(
-                                    Message(
-                                        role="assistant",
-                                        content=final_answer,
-                                        timestamp=span.end_time,
-                                        tool_calls=[],
-                                    )
-                                )
-                                final_answer_added = True
-                                has_assistant_message = True
-                        else:
-                            # Remove any trailing JSON artifacts
-                            thought = thought.rstrip('"}')
-                            messages.append(
-                                Message(
-                                    role="assistant",
-                                    content=thought,
-                                    timestamp=span.start_time,
-                                    tool_calls=tool_calls,
-                                )
+                    if thought or tool_calls:
+                        messages.append(
+                            Message(
+                                role="assistant",
+                                content=thought or "",
+                                timestamp=span.start_time,
+                                tool_calls=tool_calls,
                             )
-                            current_tool_calls.extend(tool_calls)
-                            has_assistant_message = True
+                        )
+                        current_tool_calls.extend(tool_calls)
+                        has_assistant_message = True
 
-                            # Add any pending tool messages now that we have an assistant message
-                            if has_assistant_message and pending_tool_messages:
-                                messages.extend(pending_tool_messages)
-                                pending_tool_messages = []
+                        # Add any pending tool messages now that we have an assistant message
+                        if pending_tool_messages:
+                            messages.extend(pending_tool_messages)
+                            pending_tool_messages = []
 
             elif span.name == "Tool Usage" or span.attributes.get("gen_ai.agent.tools"):
-                # Process tool usage span
+                # Handle CrewAI tool format
                 tool_name = None
                 tool_output = ""
 
                 # Try to get tool name from tool definition
                 if "gen_ai.agent.tools" in span.attributes:
                     try:
-                        # Handle single-quoted string using ast.literal_eval first
                         tools_str = span.attributes["gen_ai.agent.tools"]
                         if isinstance(tools_str, str):
                             tools = ast.literal_eval(tools_str)
@@ -134,7 +218,6 @@ class TraceConverter:
                 # Get tool output from new format
                 if "gen_ai.agent.tool_results" in span.attributes:
                     try:
-                        # Handle single-quoted string using ast.literal_eval first
                         results_str = span.attributes["gen_ai.agent.tool_results"]
                         if isinstance(results_str, str):
                             results = ast.literal_eval(results_str)
@@ -148,7 +231,6 @@ class TraceConverter:
                         pass
 
                 if tool_output and tool_name:
-                    # Remove any trailing JSON artifacts
                     tool_output = tool_output.rstrip('"}')
                     tool_message = Message(
                         role="tool",
@@ -157,17 +239,17 @@ class TraceConverter:
                         tool_calls=[],
                     )
 
-                    # Only add tool message immediately if we have an assistant message
+                    # Update the corresponding tool call with the output
+                    for tool_call in current_tool_calls:
+                        if tool_call.name == tool_name:
+                            tool_call.output = tool_output
+                            break
+
+                    # Add message immediately if we have an assistant message, otherwise store it
                     if has_assistant_message:
                         messages.append(tool_message)
                     else:
                         pending_tool_messages.append(tool_message)
-
-                    # Update the corresponding tool call with the output
-                    for msg in messages:
-                        for tool_call in msg.tool_calls:
-                            if tool_call.name == tool_name:
-                                tool_call.output = tool_output
 
         return Trajectory(
             trace_id=format(spans[0].context.trace_id, "032x") if spans else "",
@@ -216,63 +298,59 @@ class TraceConverter:
     def _parse_assistant_output(
         self, completion: str, timestamp: datetime
     ) -> tuple[List[ToolCall], Optional[str]]:
-        """Parse the assistant's output to extract tool calls and thought."""
+        """Parse the assistant output to extract tool calls and thought."""
         tool_calls = []
-        thought = None
 
-        # Clean up completion string
-        completion = completion.strip()
-        if completion.startswith('"') and completion.endswith('"'):
-            completion = completion[1:-1]
-
-        # Try to parse as JSON if it looks like JSON
-        try:
-            if completion.startswith("{"):
-                data = json.loads(completion)
-                if isinstance(data, dict) and "gen_ai.completion" in data:
-                    completion = data["gen_ai.completion"]
-        except (json.JSONDecodeError, TypeError):
-            pass
+        # Check for Final Answer first
+        if "Final Answer:" in completion:
+            final_answer_match = re.search(r"Final Answer:(.*?)(?=\n|$)", completion, re.DOTALL)
+            if final_answer_match:
+                return [], final_answer_match.group(1).strip()
 
         # Extract thought if present
         thought_match = re.search(
             r"Thought:(.*?)(?=\nAction:|Final Answer:|$)", completion, re.DOTALL
         )
-        if thought_match:
-            thought = thought_match.group(1).strip()
+        thought = thought_match.group(1).strip() if thought_match else None
 
-        # Extract tool calls
-        action_pattern = r"Action:\s*(.*?)\nAction Input:\s*(.*?)(?=\n(?:Thought:|Action:|Final Answer:|Observation:|$)|\Z)"
-        action_matches = list(re.finditer(action_pattern, completion, re.DOTALL))
-
-        for match in action_matches:
-            tool_name = match.group(1).strip()
-            tool_input = match.group(2).strip()
-
-            # Clean up tool input
-            if tool_input.startswith('"') and tool_input.endswith('"'):
-                tool_input = tool_input[1:-1]
-
-            try:
-                tool_args = json.loads(tool_input)
-            except json.JSONDecodeError:
-                # If JSON parsing fails, try to extract the JSON part
-                json_match = re.search(r"\{.*\}", tool_input)
-                if json_match:
-                    try:
-                        tool_args = json.loads(json_match.group(0))
-                    except json.JSONDecodeError:
-                        tool_args = {"query": tool_input}
-                else:
-                    tool_args = {"query": tool_input}
-
-            tool_calls.append(
-                ToolCall(
-                    name=tool_name,
-                    arguments=tool_args,
-                    output=None,
-                )
+        # Extract action if present
+        action_match = re.search(r"Action:(.*?)(?=\nAction Input:|$)", completion, re.DOTALL)
+        if action_match:
+            action = action_match.group(1).strip()
+            # Extract action input
+            action_input_match = re.search(
+                r"Action Input:(.*?)(?=\nObservation:|$)", completion, re.DOTALL
             )
+            if action_input_match:
+                action_input = action_input_match.group(1).strip()
+                # Try to parse action input as JSON
+                try:
+                    # If it's already a dictionary string, parse it
+                    if action_input.startswith("{"):
+                        arguments = json.loads(action_input)
+                    else:
+                        # If it's a quoted string, remove the quotes first
+                        if action_input.startswith('"') and action_input.endswith('"'):
+                            action_input = action_input[1:-1]
+                        # Try to find a JSON object within the string
+                        json_match = re.search(r"\{.*\}", action_input)
+                        if json_match:
+                            arguments = json.loads(json_match.group(0))
+                        else:
+                            # If no JSON found, create a simple dict with the input as a value
+                            arguments = {"input": action_input}
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, create a simple dict with the input as a value
+                    arguments = {"input": action_input}
+
+                tool_calls.append(
+                    ToolCall(
+                        name=action,
+                        arguments=arguments,
+                        timestamp=timestamp,
+                        output=None,
+                    )
+                )
 
         return tool_calls, thought
 

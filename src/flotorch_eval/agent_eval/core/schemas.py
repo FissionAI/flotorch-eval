@@ -16,6 +16,7 @@ class ToolCall(BaseModel):
         description="Arguments passed to the tool"
     )
     output: Optional[str] = Field(None, description="Output from the tool")
+    timestamp: Optional[datetime] = Field(None, description="When the tool was invoked")
 
 
 class Message(BaseModel):
