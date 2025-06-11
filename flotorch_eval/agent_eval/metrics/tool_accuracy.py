@@ -14,8 +14,12 @@ class ToolAccuracyMetric(BaseMetric):
     @property
     def name(self) -> str:
         return "tool_accuracy"
+    
+    def _setup(self) -> None:
+        """No setup needed for this metric."""
+        pass
 
-    def compute(self, trajectory: Trajectory) -> MetricResult:
+    async def compute(self, trajectory: Trajectory) -> MetricResult:
         """
         Compute tool accuracy score for a trajectory.
 
