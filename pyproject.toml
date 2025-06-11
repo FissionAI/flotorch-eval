@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flotorch-eval"
-version = "0.1.0"
+version = "0.2.2"
 description = "A comprehensive evaluation framework for AI systems"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -68,4 +68,4 @@ python_files = ["test_*.py"]
 addopts = "--asyncio-mode=auto"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/flotorch_eval"] 
+packages = ["flotorch_eval"]
