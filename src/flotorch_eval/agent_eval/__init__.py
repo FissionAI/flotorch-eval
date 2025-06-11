@@ -12,7 +12,7 @@ from flotorch_eval.agent_eval.core.schemas import (
     ToolCall,
     Trajectory,
 )
-from flotorch_eval.agent_eval.core.trace_converter import TraceConverter
+from flotorch_eval.agent_eval.core.converter import TraceConverter
 from flotorch_eval.agent_eval.metrics.base import BaseMetric
 from flotorch_eval.agent_eval.metrics.langchain_metrics import TrajectoryEvalWithLLMMetric
 from flotorch_eval.agent_eval.metrics.ragas_metrics import (
