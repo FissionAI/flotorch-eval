@@ -66,7 +66,7 @@ class MetricResult(BaseModel):
 
     name: str
     score: float
-    details: Optional[Dict[str, Union[str, int, float, bool, List[str]]]]
+    details: Optional[Dict[str, Union[str, int, float, bool, List[str], List[Dict[str, Union[str, int, float]]]]]]
 
 
 class EvaluationResult(BaseModel):
@@ -78,3 +78,41 @@ class EvaluationResult(BaseModel):
     metadata: Dict[str, Union[str, int, float, bool, List[str]]] = Field(
         default_factory=dict
     )
+
+
+class TokenUsageRecord(BaseModel):
+    """Represents token usage details for a single span."""
+    span_name: str
+    span_id: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+class TokenTotals(BaseModel):
+    """Aggregated totals for all token usage across spans."""
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+class TokenUsageSummary(BaseModel):
+    """Structured response containing per-span token usage and overall totals."""
+    token_usage: List[TokenUsageRecord]
+    totals: TokenTotals
+
+class CostRecord(BaseModel):
+    """Per-span cost breakdown."""
+    span_id: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost: float
+
+
+class CostSummary(BaseModel):
+    """Aggregate and per-span cost results."""
+    total_cost: float
+    average_cost_per_call: float
+    cost_breakdown: List[CostRecord]
