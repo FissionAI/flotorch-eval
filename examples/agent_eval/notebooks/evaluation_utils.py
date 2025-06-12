@@ -35,11 +35,9 @@ def display_evaluation_results(results: Any):
 
     data = []
     for metric in results.scores:
-        # Make a copy to avoid modifying the original results object
         details_dict = metric.details.copy() if metric.details else {}
         display_parts = []
 
-        # Primary details handling (Error, Comment, or Latency)
         if 'error' in details_dict:
             error_message = f"Error: {details_dict.pop('error')}"
             display_parts.append(textwrap.fill(error_message, width=80))
@@ -65,10 +63,8 @@ def display_evaluation_results(results: Any):
             
             display_parts.append("\n".join(latency_summary))
 
-        # Handle any other remaining details, including usage_summary
         other_details = []
         if details_dict:
-            # Specifically format cost_breakdown if it exists
             if 'cost_breakdown' in details_dict and isinstance(details_dict['cost_breakdown'], list):
                  details_dict['cost_breakdown'] = "\n" + "\n".join([f"    - {item}" for item in details_dict['cost_breakdown']])
 
@@ -80,7 +76,6 @@ def display_evaluation_results(results: Any):
                 display_parts.append("\n" + "-"*20)
             display_parts.append("\n".join(other_details))
         
-        # Format the final score
         score_display = f"{metric.score:.2f}" if isinstance(metric.score, (int, float)) else "N/A"
 
         data.append({
@@ -89,20 +84,18 @@ def display_evaluation_results(results: Any):
             "Details": "\n".join(display_parts)
         })
 
-    # Configure and display the DataFrame
     df = pd.DataFrame(data)
     pd.set_option('display.max_colwidth', None)
 
-    # *** FIX: Use Pandas Styler for proper newline rendering ***
     styled_df = df.style.set_properties(
-        subset=['Details'],  # Apply this style only to the 'Details' column
+        subset=['Details'],
         **{
-            'white-space': 'pre-wrap', # Crucial for rendering \n
+            'white-space': 'pre-wrap',
             'text-align': 'left'
         }
     ).set_table_styles(
-        [dict(selector="th", props=[("text-align", "left")])] # Align headers
-    ).hide(axis="index") # Hide the default 0, 1, 2... index
+        [dict(selector="th", props=[("text-align", "left")])]
+    ).hide(axis="index")
 
     display(styled_df)
     
