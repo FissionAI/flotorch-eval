@@ -44,3 +44,15 @@ def convert_to_ragas_format(trajectory: Trajectory) -> List[r.Message]:
         elif msg.role == "tool":
             ragas_messages.append(r.ToolMessage(content=msg.content))
     return ragas_messages
+
+
+def convert_trajectory_to_ragas_messages(trajectory: Trajectory) -> List[r.Message]:
+    ragas_messages = []
+    for span in trajectory.spans:
+        if span.role == "user":
+            ragas_messages.append(r.HumanMessage(content=span.content))
+        elif span.role == "assistant":
+            ragas_messages.append(r.AIMessage(content=span.content))
+        elif span.role == "tool":
+            ragas_messages.append(r.ToolMessage(content=span.content))
+    return ragas_messages
