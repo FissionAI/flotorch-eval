@@ -44,6 +44,7 @@ class ToolAccuracyMetric(BaseMetric):
                 name=self.name,
                 score=1.0,  # Perfect score if no tool calls (vacuous truth)
                 details={
+                    "comment": "No tool calls were made in this trajectory.",
                     "total_calls": 0,
                     "successful_calls": 0,
                     "failed_calls": 0,
@@ -75,6 +76,7 @@ class ToolAccuracyMetric(BaseMetric):
             name=self.name,
             score=score,
             details={
+                "comment": "Tool usage statistics calculated successfully.",
                 "total_calls": len(tool_calls),
                 "successful_calls": successful,
                 "failed_calls": failed,
