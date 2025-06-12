@@ -6,7 +6,7 @@ from flotorch_eval.agent_eval.core.schemas import (
     Trajectory,
 )
 
-def extract_token_usage_from_spans(trajectory: Trajectory) -> TokenUsageSummary:
+def extract_token_usage_from_trajectory(trajectory: Trajectory) -> TokenUsageSummary:
     records = []
     total_input = 0
     total_output = 0
