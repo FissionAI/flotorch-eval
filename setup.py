@@ -4,17 +4,6 @@ Setup configuration for flotorch-eval package.
 
 from setuptools import find_packages, setup
 
-# Read requirements
-with open("requirements/base.txt") as f:
-    base_requirements = [line.strip() for line in f if line.strip() and not line.startswith("-r")]
-
-with open("requirements/agent_eval.txt") as f:
-    agent_eval_requirements = [
-        line.strip() for line in f if line.strip() and not line.startswith("-r")
-    ]
-with open("requirements/dev.txt") as f:
-    dev_requirements = [line.strip() for line in f if line.strip() and not line.startswith("-r")]
-
 setup(
     name="flotorch-eval",
     version="0.2.2",
@@ -26,12 +15,6 @@ setup(
     url="https://github.com/flotorch/flotorch-eval",
     packages=find_packages(),
     python_requires=">=3.8",
-    install_requires=base_requirements,
-    extras_require={
-        "agent": agent_eval_requirements,
-        "dev": dev_requirements,
-        "all": agent_eval_requirements + dev_requirements,
-    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
