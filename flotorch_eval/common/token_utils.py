@@ -13,8 +13,16 @@ def extract_token_usage_from_trajectory(trajectory: Trajectory) -> TokenUsageSum
 
     for span in trajectory.spans:
         attributes = span.attributes
+
+        # CrewAI-style
         input_tokens = attributes.get("gen_ai.usage.input_tokens")
         output_tokens = attributes.get("gen_ai.usage.output_tokens")
+
+        # Strands-style fallback
+        if input_tokens is None and output_tokens is None:
+            input_tokens = attributes.get("gen_ai.usage.prompt_tokens")
+            output_tokens = attributes.get("gen_ai.usage.completion_tokens")
+
         model = attributes.get("gen_ai.response.model") or attributes.get("gen_ai.request.model")
 
         if input_tokens is not None and output_tokens is not None and model:
