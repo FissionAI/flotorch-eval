@@ -6,7 +6,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="flotorch-eval",
-    version="0.2.2",
+    version="1.0.1",
     description="A comprehensive evaluation framework for AI systems",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
