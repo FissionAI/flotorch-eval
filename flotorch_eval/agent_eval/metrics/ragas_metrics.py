@@ -113,7 +113,9 @@ class ToolCallAccuracyMetric(BaseMetric, RagasMetricMixin):
         return MetricResult(
             name=self.name,
             score=score,
-            details={"evaluation_type": "tool_call_accuracy"},
+            details={
+                "comment": "Evaluation completed successfully.",
+                "evaluation_type": "tool_call_accuracy"},
         )
 
     async def _evaluate_interaction(
