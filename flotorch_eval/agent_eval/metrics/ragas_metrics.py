@@ -95,7 +95,7 @@ class ToolCallAccuracyMetric(BaseMetric, RagasMetricMixin):
             return MetricResult(
                 name=self.name,
                 score=0.0,
-                details={"error": "No tool calls found to evaluate"},
+                details={"info": "No tool calls found to evaluate"},
             )
 
         # Evaluate

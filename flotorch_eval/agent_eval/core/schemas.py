@@ -3,7 +3,7 @@ Core schemas for agent evaluation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -66,7 +66,7 @@ class MetricResult(BaseModel):
 
     name: str
     score: Union[float, Literal["N/A"]]
-    details: Optional[Dict[str, Union[str, int, float, bool, List[str], List[Dict[str, Union[str, int, float]]]]]]
+    details: Optional[Dict[str, Any]]
 
 
 class EvaluationResult(BaseModel):
@@ -118,14 +118,16 @@ class CostSummary(BaseModel):
     cost_breakdown: List[CostRecord]
 
 class LatencyBreakdownItem:
-    def __init__(self, step_name: str, latency_ms: float):
+    def __init__(self, step_name: str, latency_ms: float, children: Optional[List['LatencyBreakdownItem']] = None):
         self.step_name = step_name
         self.latency_ms = latency_ms
+        self.children = children or []
 
     def to_dict(self) -> Dict:
         return {
             "step_name": self.step_name,
             "latency_ms": self.latency_ms,
+            "children": [child.to_dict() for child in self.children]
         }
 
 class LatencySummary:

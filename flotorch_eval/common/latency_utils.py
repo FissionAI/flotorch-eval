@@ -26,7 +26,7 @@ def extract_latency_from_trajectory(trajectory: Trajectory) -> LatencySummary:
         if not item:
             continue
 
-        parent_id = span.parent_span_id
+        parent_id = getattr(span, "parent_span_id", None)
         if parent_id and parent_id in id_to_item:
             parent_to_children[parent_id].append(item)
         else:
