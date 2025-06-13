@@ -3,7 +3,7 @@ Core schemas for agent evaluation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -65,7 +65,7 @@ class MetricResult(BaseModel):
     """Result from a single metric evaluation."""
 
     name: str
-    score: float
+    score: Union[float, Literal["N/A"]]
     details: Optional[Dict[str, Union[str, int, float, bool, List[str], List[Dict[str, Union[str, int, float]]]]]]
 
 

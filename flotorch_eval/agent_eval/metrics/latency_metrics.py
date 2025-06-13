@@ -32,6 +32,6 @@ class LatencyMetric(BaseMetric):
 
         return MetricResult(
             name=self.name,
-            score=0.0, 
+            score="N/A", 
             details=latency_summary.to_dict()
         )

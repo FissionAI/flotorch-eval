@@ -37,7 +37,7 @@ class UsageMetric(BaseMetric):
 
         return MetricResult(
             name=self.name,
-            score=0.0,
+            score="N/A",
             details={
                 "total_cost": cost_summary.total_cost,
                 "average_cost_per_call": cost_summary.average_cost_per_call,
