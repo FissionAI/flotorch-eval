@@ -2,7 +2,7 @@ from typing import Optional
 from flotorch_eval.agent_eval.metrics.base import BaseMetric, MetricConfig
 from flotorch_eval.agent_eval.core.schemas import MetricResult, Trajectory
 from flotorch_eval.common.cost_utils import calculate_cost_from_tokens
-from flotorch_eval.common.token_utils import extract_token_usage_from_spans
+from flotorch_eval.common.token_utils import extract_token_usage_from_trajectory
 
 class UsageMetric(BaseMetric):
     """Metric to compute cost/token of LLM usage per span and overall."""
@@ -31,7 +31,7 @@ class UsageMetric(BaseMetric):
         Returns:
             MetricResult with cost summary.
         """
-        token_summary = extract_token_usage_from_spans(trajectory)
+        token_summary = extract_token_usage_from_trajectory(trajectory)
 
         cost_summary = calculate_cost_from_tokens(token_summary, aws_region=self.aws_region)
 

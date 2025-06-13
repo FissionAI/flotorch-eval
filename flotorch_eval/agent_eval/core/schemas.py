@@ -116,3 +116,32 @@ class CostSummary(BaseModel):
     total_cost: float
     average_cost_per_call: float
     cost_breakdown: List[CostRecord]
+
+class LatencyBreakdownItem:
+    def __init__(self, step_name: str, latency_ms: float):
+        self.step_name = step_name
+        self.latency_ms = latency_ms
+
+    def to_dict(self) -> Dict:
+        return {
+            "step_name": self.step_name,
+            "latency_ms": self.latency_ms,
+        }
+
+class LatencySummary:
+    def __init__(
+        self,
+        total_latency_ms: float,
+        average_step_latency_ms: float,
+        latency_breakdown: List[LatencyBreakdownItem]
+    ):
+        self.total_latency_ms = total_latency_ms
+        self.average_step_latency_ms = average_step_latency_ms
+        self.latency_breakdown = latency_breakdown
+
+    def to_dict(self) -> Dict:
+        return {
+            "total_latency_ms": self.total_latency_ms,
+            "average_step_latency_ms": self.average_step_latency_ms,
+            "latency_breakdown": [item.to_dict() for item in self.latency_breakdown],
+        }
