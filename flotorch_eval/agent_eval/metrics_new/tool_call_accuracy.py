@@ -38,10 +38,12 @@ class ToolCallAccuracyMetric(BaseMetric):
         Returns:
             MetricResult with score and optional details
         """
-        score = await self.engine.compute_from_trajectory(trajectory)
+        result = await self.engine.compute_from_trajectory(trajectory)
+
+        details = {"evaluation_type": "tool_call_accuracy", **result.metadata}
 
         return MetricResult(
             name=self.name,
-            score=score,
-            details={"evaluation_type": "tool_call_accuracy"},
+            score=result.score,
+            details=details,
         )

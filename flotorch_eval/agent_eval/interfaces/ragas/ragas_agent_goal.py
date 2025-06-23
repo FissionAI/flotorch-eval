@@ -3,7 +3,7 @@ from typing import Optional
 from ragas.dataset_schema import MultiTurnSample
 from ragas.metrics import AgentGoalAccuracyWithReference, AgentGoalAccuracyWithoutReference
 
-from flotorch_eval.agent_eval.core.schemas import Trajectory
+from flotorch_eval.agent_eval.core.schemas import EvaluationScore, Trajectory
 from flotorch_eval.agent_eval.interfaces.base.agent_goal_interface import AgentGoalScoringEngine
 from flotorch_eval.agent_eval.integrations.ragas_utils import convert_trajectory_to_ragas_messages
 from ragas.llms import LangchainLLMWrapper
@@ -31,19 +31,26 @@ class RagasAgentGoalAccuracyEngine(AgentGoalScoringEngine):
 
         self.evaluator.llm = self.llm
 
-    async def compute_from_trajectory(self, trajectory: Trajectory) -> float:
+    
+    async def compute_from_trajectory(self, trajectory: Trajectory) -> EvaluationScore:
         try:
-            ragas_messages = convert_trajectory_to_ragas_messages(trajectory)
+            ragas_messages, _ = convert_trajectory_to_ragas_messages(trajectory)
             if not ragas_messages:
-                return 0.0
+                return EvaluationScore(score=0.0, metadata={"error": "No user input extracted from trajectory"})
 
             sample_params = {"user_input": ragas_messages}
             if self.has_reference:
                 sample_params["reference"] = self.config.metric_params["reference_answer"]
 
             sample = MultiTurnSample(**sample_params)
-            return await self.evaluator.multi_turn_ascore(sample)
+            score = await self.evaluator.multi_turn_ascore(sample)
+
+            return EvaluationScore(
+                score=score,
+                metadata={
+                    "evaluation_type": "agent_goal_with_reference" if self.has_reference else "agent_goal_without_reference"
+                },
+            )
 
         except Exception as e:
-            print(f"[RagasAgentGoalAccuracyEngine] Error: {e}")
-            return 0.0
+            return EvaluationScore(score=0.0, metadata={"error": str(e)})

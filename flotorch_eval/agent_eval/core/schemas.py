@@ -147,3 +147,7 @@ class LatencySummary:
             "average_step_latency_ms": self.average_step_latency_ms,
             "latency_breakdown": [item.to_dict() for item in self.latency_breakdown],
         }
+    
+class EvaluationScore(BaseModel):
+    score: Union[float, str, int]
+    metadata: Dict[str, Any]

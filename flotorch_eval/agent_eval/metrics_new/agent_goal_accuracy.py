@@ -9,7 +9,7 @@ from flotorch_eval.agent_eval.metrics.base import MetricConfig
 class AgentGoalAccuracyMetric(BaseMetric):
     """
     Evaluates agent goal accuracy using a pluggable scoring engine.
-    Supports both direct engine injection or default Ragas engine via LLM and config.
+    Supports both direct engine injection or default engine via LLM and config.
     """
 
     requires_llm = True
@@ -22,8 +22,8 @@ class AgentGoalAccuracyMetric(BaseMetric):
     ):
         """
         Args:
-            llm: Optional LLM used by Ragas engine (ignored if custom engine is passed)
-            config: Optional metric config passed to the Ragas engine
+            llm: Optional LLM used by engine (ignored if custom engine is passed)
+            config: Optional metric config passed to the engine
             engine: Optional custom scoring engine
         """
         self.engine = engine or RagasAgentGoalAccuracyEngine(llm=llm, config=config)
@@ -37,10 +37,12 @@ class AgentGoalAccuracyMetric(BaseMetric):
         pass
 
     async def compute(self, trajectory: Trajectory) -> MetricResult:
-        score = await self.engine.compute_from_trajectory(trajectory)
+        result = await self.engine.compute_from_trajectory(trajectory)
+
+        details = {"evaluation_type": "agent_goal_accuracy", **result.metadata}
 
         return MetricResult(
             name=self.name,
-            score=score,
-            details={"evaluation_type": "agent_goal_accuracy"},
+            score=result.score,
+            details=details,
         )
