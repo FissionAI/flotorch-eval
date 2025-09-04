@@ -6,7 +6,7 @@ from datetime import datetime
 import ast
 import json
 import re
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 from opentelemetry.trace import Span as OTelSpan
 from opentelemetry.trace import SpanKind
@@ -16,13 +16,18 @@ from flotorch_eval.common.utils import convert_attributes
 
 
 class TraceConverter:
-    """Converts OpenTelemetry traces into agent trajectories using standardized conventions."""
+    """Converts OpenTelemetry traces from FloTorch Gateway into agent trajectories."""
 
     def from_spans(self, spans: List[OTelSpan]) -> Trajectory:
+        """
+        Constructs a Trajectory from a list of FloTorch OTel spans.
+
+        This method processes spans based on the official OpenTelemetry GenAI semantic
+        conventions, extracting conversation messages from span events.
+        """
         sorted_spans = sorted(spans, key=lambda x: x.start_time)
         internal_spans = []
 
-        # First convert all spans to our internal format
         for span in sorted_spans:
             internal_span = Span(
                 span_id=format(span.context.span_id, "016x"),
@@ -44,212 +49,95 @@ class TraceConverter:
             internal_spans.append(internal_span)
 
         messages: List[Message] = []
-        current_tool_calls = []  # Track all tool calls for matching with outputs
-        pending_tool_messages = []  # Store tool messages until their assistant message
-        has_assistant_message = False
+        tool_calls_map: Dict[str, ToolCall] = {}
 
-        # Process spans to build the conversation
         for span in internal_spans:
-            if span.name.startswith("Model invoke"):
-                # Handle Strands format
-                prompt = span.attributes.get("gen_ai.prompt")
-                completion = span.attributes.get("gen_ai.completion")
-
-                if prompt:
-                    try:
-                        prompt_data = json.loads(prompt)
-                        if isinstance(prompt_data, list) and len(prompt_data) > 0:
-                            user_msg = prompt_data[0]
-                            if user_msg.get("role") == "user" and not any(m.role == "user" for m in messages):
-                                content = user_msg.get("content", [])
-                                if isinstance(content, list) and len(content) > 0:
-                                    user_content = content[0].get("text", "")
-                                    messages.append(
-                                        Message(
-                                            role="user",
-                                            content=user_content,
-                                            timestamp=span.start_time,
-                                            tool_calls=[],
-                                        )
-                                    )
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
-
-                if completion:
-                    try:
-                        completion_data = json.loads(completion)
-                        if isinstance(completion_data, list):
-                            thought = None
-                            tool_calls = []
-                            
-                            for item in completion_data:
-                                if isinstance(item, dict):
-                                    if "text" in item:
-                                        thought = item["text"]
-                                    elif "toolUse" in item:
-                                        tool_use = item["toolUse"]
-                                        tool_calls.append(
-                                            ToolCall(
-                                                name=tool_use.get("name", ""),
-                                                arguments=tool_use.get("input", {}),
-                                                timestamp=span.start_time,
-                                                output=None
-                                            )
-                                        )
-                            
-                            if thought or tool_calls:
-                                messages.append(
-                                    Message(
-                                        role="assistant",
-                                        content=thought or "",
-                                        timestamp=span.start_time,
-                                        tool_calls=tool_calls,
-                                    )
-                                )
-                                current_tool_calls.extend(tool_calls)
-                                has_assistant_message = True
-
-                                # Add any pending tool messages now that we have an assistant message
-                                if pending_tool_messages:
-                                    messages.extend(pending_tool_messages)
-                                    pending_tool_messages = []
-
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
-
-            elif span.name.startswith("Tool:"):
-                # Handle Strands tool format
-                tool_name = span.name.replace("Tool: ", "")
-                tool_result = span.attributes.get("tool.result")
+            sorted_events = sorted(span.events, key=lambda e: e.timestamp)
+            
+            for event in sorted_events:
+                event_attrs = event.attributes
                 
-                if tool_result:
-                    try:
-                        result_data = json.loads(tool_result)
-                        if isinstance(result_data, list):
-                            # Combine all text parts
-                            tool_output_parts = []
-                            for item in result_data:
-                                if isinstance(item, dict) and "text" in item:
-                                    text = item.get("text", "").strip()
-                                    if text:
-                                        tool_output_parts.append(text)
-                            
-                            tool_output = "\n".join(tool_output_parts)
-                            
-                            if tool_output:
-                                tool_message = Message(
-                                    role="tool",
-                                    content=tool_output,
-                                    timestamp=span.end_time,
-                                    tool_calls=[],
-                                )
-
-                                # Update the corresponding tool call with the output
-                                for tool_call in current_tool_calls:
-                                    if tool_call.name == tool_name:
-                                        tool_call.output = tool_output
-                                        break
-
-                                # Add message immediately if we have an assistant message, otherwise store it
-                                if has_assistant_message:
-                                    messages.append(tool_message)
-                                else:
-                                    pending_tool_messages.append(tool_message)
-
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
-
-            elif span.name.startswith("chat") or span.attributes.get(
-                "gen_ai.operation.name"
-            ) in ["chat", "completion"]:
-                # Handle CrewAI format
-                prompt = self._extract_prompt_from_events(span)
-                completion = self._extract_completion_from_events(span)
-
-                if prompt:
-                    user_content = self._extract_user_content_from_prompt(prompt)
-                    if user_content and not any(m.role == "user" for m in messages):
+                # --- Handle User Message ---
+                if event.name == "gen_ai.user.message":
+                    content = event_attrs.get("message.content", "")
+                    if content:
                         messages.append(
                             Message(
                                 role="user",
-                                content=user_content,
-                                timestamp=span.start_time,
+                                content=content,
+                                timestamp=event.timestamp,
                                 tool_calls=[],
                             )
                         )
+                
+                # --- Handle Assistant Message (thought and tool calls) ---
+                elif event.name in ("gen_ai.assistant.message", "gen_ai.choice"):
+                    thought = event_attrs.get("message.content") or ""
+                    tool_calls_str = event_attrs.get("message.tool_calls")
+                    parsed_tool_calls: List[ToolCall] = []
 
-                if completion:
-                    tool_calls, thought = self._parse_assistant_output(
-                        completion, span.start_time
+                    if tool_calls_str and isinstance(tool_calls_str, str):
+                        try:
+                            tool_calls_data = json.loads(tool_calls_str)
+                            for tc_data in tool_calls_data:
+                                function_data = tc_data.get("function", {})
+                                try:
+                                    arguments = json.loads(function_data.get("arguments", "{}"))
+                                except (json.JSONDecodeError, TypeError):
+                                    arguments = {"raw": function_data.get("arguments")}
+
+                                tool_call = ToolCall(
+                                    id=tc_data.get("id"),
+                                    name=function_data.get("name", ""),
+                                    arguments=arguments,
+                                    timestamp=event.timestamp,
+                                    output=None,
+                                )
+                                parsed_tool_calls.append(tool_call)
+                                if tool_call.id:
+                                    tool_calls_map[tool_call.id] = tool_call
+                        except (json.JSONDecodeError, TypeError, AttributeError):
+                            pass
+                    
+                    messages.append(
+                        Message(
+                            role="assistant",
+                            content=thought,
+                            timestamp=event.timestamp,
+                            tool_calls=parsed_tool_calls,
+                        )
                     )
-                    if thought or tool_calls:
+                    
+                # --- Handle System Message ---
+                elif event.name == "gen_ai.system.message":
+                    content = event_attrs.get("message.content", "")
+                    if content:
                         messages.append(
                             Message(
-                                role="assistant",
-                                content=thought or "",
-                                timestamp=span.start_time,
-                                tool_calls=tool_calls,
+                                role="system",
+                                content=content,
+                                timestamp=event.timestamp,
+                                tool_calls=[],
                             )
                         )
-                        current_tool_calls.extend(tool_calls)
-                        has_assistant_message = True
+                
+                # --- Handle Tool Message (tool result) ---
+                elif event.name == "gen_ai.tool.message":
+                    tool_output = event_attrs.get("message.content", "")
+                    tool_call_id = event_attrs.get("tool.call.id")
 
-                        # Add any pending tool messages now that we have an assistant message
-                        if pending_tool_messages:
-                            messages.extend(pending_tool_messages)
-                            pending_tool_messages = []
+                    # Link the output back to the original tool call
+                    if tool_call_id and tool_call_id in tool_calls_map:
+                        tool_calls_map[tool_call_id].output = tool_output
 
-            elif span.name == "Tool Usage" or span.attributes.get("gen_ai.agent.tools"):
-                # Handle CrewAI tool format
-                tool_name = None
-                tool_output = ""
-
-                # Try to get tool name from tool definition
-                if "gen_ai.agent.tools" in span.attributes:
-                    try:
-                        tools_str = span.attributes["gen_ai.agent.tools"]
-                        if isinstance(tools_str, str):
-                            tools = ast.literal_eval(tools_str)
-                            if tools and isinstance(tools, list) and len(tools) > 0:
-                                tool_name = tools[0].get("name")
-                    except (ValueError, SyntaxError, AttributeError):
-                        pass
-
-                # Get tool output from new format
-                if "gen_ai.agent.tool_results" in span.attributes:
-                    try:
-                        results_str = span.attributes["gen_ai.agent.tool_results"]
-                        if isinstance(results_str, str):
-                            results = ast.literal_eval(results_str)
-                            if (
-                                results
-                                and isinstance(results, list)
-                                and len(results) > 0
-                            ):
-                                tool_output = results[0].get("result", "")
-                    except (ValueError, SyntaxError, AttributeError):
-                        pass
-
-                if tool_output and tool_name:
-                    tool_output = tool_output.rstrip('"}')
-                    tool_message = Message(
-                        role="tool",
-                        content=tool_output,
-                        timestamp=span.end_time,
-                        tool_calls=[],
+                    messages.append(
+                        Message(
+                            role="tool",
+                            content=tool_output,
+                            timestamp=event.timestamp,
+                            tool_calls=[],
+                        )
                     )
-
-                    # Update the corresponding tool call with the output
-                    for tool_call in current_tool_calls:
-                        if tool_call.name == tool_name:
-                            tool_call.output = tool_output
-                            break
-
-                    # Add message immediately if we have an assistant message, otherwise store it
-                    if has_assistant_message:
-                        messages.append(tool_message)
-                    else:
-                        pending_tool_messages.append(tool_message)
 
         return Trajectory(
             trace_id=format(spans[0].context.trace_id, "032x") if spans else "",
@@ -258,10 +146,16 @@ class TraceConverter:
         )
 
     def _convert_attributes(
-        self, attributes: Dict[str, Union[str, int, float, bool, List[str]]]
+        self, attributes: Dict[str, Any]
     ) -> Dict[str, Union[str, int, float, bool, List[str]]]:
-        """Convert span attributes to our internal format."""
+        """
+        Sanitizes attribute values to be JSON-serializable primitives.
+        Complex objects are converted to JSON strings.
+        """
         result = {}
+        if not attributes:
+            return result
+            
         for key, value in attributes.items():
             if isinstance(value, (str, int, float, bool)) or (
                 isinstance(value, list)
@@ -274,87 +168,6 @@ class TraceConverter:
                 except TypeError:
                     result[key] = str(value)
         return result
-
-    def _extract_prompt_from_events(self, span: Span) -> Optional[str]:
-        """Extract prompt from span events."""
-        for event in span.events:
-            if "gen_ai.content.prompt" in event.name:
-                prompt_data = event.attributes["gen_ai.prompt"]
-                if isinstance(prompt_data, dict):
-                    return prompt_data.get("gen_ai.prompt", "")
-                return prompt_data
-        return None
-
-    def _extract_completion_from_events(self, span: Span) -> Optional[str]:
-        """Extract completion from span events."""
-        for event in span.events:
-            if "gen_ai.content.completion" in event.name:
-                completion_data = event.attributes["gen_ai.completion"]
-                if isinstance(completion_data, dict):
-                    return completion_data.get("gen_ai.completion", "")
-                return completion_data
-        return None
-
-    def _parse_assistant_output(
-        self, completion: str, timestamp: datetime
-    ) -> tuple[List[ToolCall], Optional[str]]:
-        """Parse the assistant output to extract tool calls and thought."""
-        tool_calls = []
-
-        # Check for Final Answer first
-        if "Final Answer:" in completion:
-            final_answer_match = re.search(r"Final Answer:(.*?)(?=\n|$)", completion, re.DOTALL)
-            if final_answer_match:
-                return [], final_answer_match.group(1).strip()
-
-        # Extract thought if present
-        thought_match = re.search(
-            r"Thought:(.*?)(?=\nAction:|Final Answer:|$)", completion, re.DOTALL
-        )
-        thought = thought_match.group(1).strip() if thought_match else None
-
-        # Extract action if present
-        action_match = re.search(r"Action:(.*?)(?=\nAction Input:|$)", completion, re.DOTALL)
-        if action_match:
-            action = action_match.group(1).strip()
-            # Extract action input
-            action_input_match = re.search(
-                r"Action Input:(.*?)(?=\nObservation:|$)", completion, re.DOTALL
-            )
-            if action_input_match:
-                action_input = action_input_match.group(1).strip()
-                # Try to parse action input as JSON
-                try:
-                    # If it's already a dictionary string, parse it
-                    if action_input.startswith("{"):
-                        arguments = json.loads(action_input)
-                    else:
-                        # If it's a quoted string, remove the quotes first
-                        if action_input.startswith('"') and action_input.endswith('"'):
-                            action_input = action_input[1:-1]
-                        # Try to find a JSON object within the string
-                        json_match = re.search(r"\{.*\}", action_input)
-                        if json_match:
-                            arguments = json.loads(json_match.group(0))
-                        else:
-                            # If no JSON found, create a simple dict with the input as a value
-                            arguments = {"input": action_input}
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, create a simple dict with the input as a value
-                    arguments = {"input": action_input}
-
-                tool_calls.append(
-                    ToolCall(
-                        name=action,
-                        arguments=arguments,
-                        timestamp=timestamp,
-                        output=None,
-                    )
-                )
-
-        return tool_calls, thought
-
-    def _extract_user_content_from_prompt(self, prompt: str) -> str:
         """Extracts the user's explicit task from the initial prompt structure."""
         user_content = prompt.strip()
 
