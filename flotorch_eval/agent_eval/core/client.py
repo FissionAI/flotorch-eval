@@ -2,7 +2,7 @@ import asyncio
 from typing import Dict, Any, List
 from flotorch_eval.agent_eval.metrics.base import LLMBaseEval
 from flotorch_eval.agent_eval.core.converter import TraceConverter
-from flotorch_eval.agent_eval.core.schemas import EvaluationResult
+from flotorch_eval.agent_eval.core.schemas import EvaluationResult, Trajectory
 
 
 class FlotorchEvalClient():
@@ -57,12 +57,12 @@ class FlotorchEvalClient():
             print(f"Evaluation failed with error: {str(e)}")
             raise
 
-    def _trace_to_trajectory(self, trace):
+    def _trace_to_trajectory(self, trace: Dict[str, Any]):
         """
         Convert a trace (list of spans) to a Trajectory object.
 
         Args:
-            trace (Any): The trace data.
+            trace (Dict[str, Any]): The trace data.
 
         Returns:
             Trajectory: The converted trajectory object.
@@ -71,12 +71,12 @@ class FlotorchEvalClient():
         trajectory = converter.from_spans(trace)
         return trajectory
 
-    async def run_evaluation(self, trajectory, metrics):
+    async def run_evaluation(self, trajectory: Trajectory, metrics: List[LLMBaseEval]):
         """
         Run all provided metrics on the given trajectory.
 
         Args:
-            trajectory: The trajectory object to evaluate.
+            trajectory (Trajectory): The trajectory object to evaluate.
             metrics (List[LLMBaseEval]): List of metric evaluators.
 
         Returns:
@@ -95,9 +95,8 @@ class FlotorchEvalClient():
                 result = metric.evaluate(trajectory, metric_params)
                 sync_results.append(result)
 
-        # Run async metrics concurrently
+        # Run async metrics concurrently in parallel
         async_results = await asyncio.gather(*async_tasks, return_exceptions=False)
 
         all_scores = sync_results + list(async_results)
         return EvaluationResult(trajectory_id=trajectory.trace_id, scores=all_scores)
-        

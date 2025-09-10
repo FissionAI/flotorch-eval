@@ -1,10 +1,11 @@
+import json
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field
-from flotorch_eval.agent_eval.metrics.prompt_manager import PromptManager
 from flotorch.sdk.llm import FlotorchLLM
-from flotorch_eval.agent_eval.core.schemas import MetricResult
-import json
+from flotorch.sdk.utils.llm_utils import LLMResponse
+from flotorch_eval.agent_eval.core.schemas import MetricResult, Trajectory
+from flotorch_eval.agent_eval.metrics.prompt_manager import PromptManager
 
 if TYPE_CHECKING:
     from flotorch_eval.agent_eval.core.client import FlotorchEvalClient
@@ -68,20 +69,20 @@ class LLMBaseEval(ABC):
         return False
 
     @abstractmethod
-    async def evaluate(self, trajectory, metric_params):
+    async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
         """
         Evaluate the metric on the given trajectory.
 
         Args:
-            trajectory: The agent trajectory to evaluate.
-            metric_params: Additional parameters for the metric.
+            trajectory (Trajectory): The agent trajectory to evaluate.
+            metric_params (Dict[str, Any]): Additional parameters for the metric.
 
         Returns:
             MetricResult: The result of the evaluation.
         """
         pass
 
-    def prepare_llm(self, client: "FlotorchEvalClient"):
+    def prepare_llm(self, client: "FlotorchEvalClient") -> None:
         """
         Prepare the LLM evaluator using the provided client.
 
@@ -95,12 +96,12 @@ class LLMBaseEval(ABC):
             base_url=client.base_url
         )
 
-    def _parse_response(self, response):
+    def _parse_response(self, response: LLMResponse) -> MetricResult:
         """
         Parse the response from the LLM and convert it to a MetricResult.
 
         Args:
-            response: The response object from the LLM.
+            response (LLMResponse): The response object from the LLM.
 
         Returns:
             MetricResult: The parsed metric result.
@@ -118,12 +119,12 @@ class LLMBaseEval(ABC):
         )
         return result
 
-    def _prepare_prompt(self, **kwargs):
+    def _prepare_prompt(self, **kwargs: Any) -> str:
         """
         Prepare the prompt for the LLM using the PromptManager.
 
         Args:
-            **kwargs: Keyword arguments to format the prompt.
+            **kwargs (Any): Keyword arguments to format the prompt.
 
         Returns:
             str: The formatted prompt string.
@@ -139,16 +140,16 @@ class LLMBaseEval(ABC):
             raise ValueError(f"Error loading prompt: {e}")
         return prompt
 
-    async def _call_llm(self, prompt, response_format=None):
+    async def _call_llm(self, prompt: str, response_format: Optional[Dict[str, Any]] = None) -> LLMResponse:
         """
         Call the LLM asynchronously with the given prompt.
 
         Args:
             prompt (str): The prompt to send to the LLM.
-            response_format (Optional[Any]): The expected response format.
+            response_format (Optional[Dict[str, Any]]): The expected response format.
 
         Returns:
-            The response from the LLM.
+            LLMResponse: The response from the LLM.
         """
         messages = [{"role": "user", "content": prompt}]
         response = await self.llm_evaluator.ainvoke(messages, response_format=response_format)
