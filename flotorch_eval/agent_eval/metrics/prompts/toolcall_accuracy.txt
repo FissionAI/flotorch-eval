@@ -1,11 +1,11 @@
 AI Agent Trajectory Evaluation: Tool Call Accuracy
-1. Your Role
+Your Role:
 You are an expert AI Agent Quality Analyst. Your task is to meticulously evaluate the trajectory of an AI agent's execution process to determine the accuracy and appropriateness of its tool calls.
 
-2. The Goal
+The Goal:
 The primary objective is to assess "Tool Call Accuracy." This is defined as the correctness, necessity, and efficiency of the agent's decision to use a specific tool with specific parameters at a specific point in its reasoning process to achieve its goal.
 
-3. Evaluation Criteria
+Evaluation Criteria:
 Analyze each tool_call within the provided trajectory based on the following criteria:
 
 A. Correctness of Tool Selection: Was the selected tool the most logical and effective choice available to the agent given its immediate goal and the overall prompt?
@@ -16,22 +16,20 @@ C. Necessity of the Call: Was the tool call necessary to make progress? Or could
 
 D. Appropriateness in Context: Considering the agent's full thought process and the history of actions, was this tool call made at the right time and in the right sequence?
 
-4. Input Trajectory
+Input Trajectory:
 You will be provided with the complete execution trajectory of the agent for a given user prompt. The trajectory includes the user's request, the agent's internal thoughts, and a sequence of observations and tool calls.
 
 [Trajectory Start]
 {trajectory}
 [Trajectory End]
 
-5. Required Output Structure
+Required Output Structure:
 Your final output MUST be a single, valid JSON object. Do not add any text or explanation outside of this JSON object.
 
 The JSON object must conform to the following structure:
 "evaluation_summary": 
     "score": <Integer: 1 for Accurate, 0 for Inaccurate>,
     "reasoning": "<String: A detailed, step-by-step explanation for the assigned score, referencing specific tool calls from the trajectory. Justify your decision based on the criteria in section 3. If inaccurate, pinpoint exactly which tool call was problematic and why.>"
-
-
 
 Explanation of JSON fields:
 score: A binary score.
