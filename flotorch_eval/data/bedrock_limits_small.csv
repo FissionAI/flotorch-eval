@@ -21,7 +21,7 @@ us-east-1,Amazon Nova Micro,us-east-1|Amazon Nova Micro,us.amazon.nova-micro-v1:
 us-east-1,Amazon Nova Lite,us-east-1|Amazon Nova Lite,us.amazon.nova-lite-v1:0,0.06,0.24
 us-east-1,Amazon Nova Pro,us-east-1|Amazon Nova Pro,us.amazon.nova-pro-v1:0,0.8,3.2
 us-east-1,Titan Embeddings - Multimodal,N.Virginia|Titan Embeddings - Multimodal,amazon.titan-embed-image-v1,0.0008,0.06
-us-east-1,,us-west-2|Cohere Reranker v3.5,cohere.rerank-v3-5:0,2,,
+us-east-1,,us-west-2|Cohere Reranker v3.5,cohere.rerank-v3-5:0,2,0
 us-west-2,Claude 3.5 Sonnet,us-west-2|Claude 3.5 Sonnet,anthropic.claude-3-5-sonnet-20240620-v1:0,3,15
 us-west-2,Claude 3.5 Sonnet v2,us-west-2|Claude 3.5 Sonnet,us.anthropic.claude-3-5-sonnet-20241022-v2:0,3,15
 us-west-2,Claude 3.5 Haiku,us-west-2|Claude 3.5 Haiku,us.anthropic.claude-3-5-haiku-20241022-v1:0,0.08,4
@@ -44,11 +44,11 @@ us-west-2,Amazon Nova Micro,us-west-2|Amazon Nova Micro,us.amazon.nova-micro-v1:
 us-west-2,Amazon Nova Lite,us-west-2|Amazon Nova Lite,us.amazon.nova-lite-v1:0,0.06,0.24
 us-west-2,Amazon Nova Pro,us-west-2|Amazon Nova Pro,us.amazon.nova-pro-v1:0,0.8,3.2
 us-west-2,Titan Embeddings - Multimodal,N.Virginia|Titan Embeddings - Multimodal,amazon.titan-embed-image-v1,0.0008,0.06
-us-west-2,,us-west-2|Cohere Reranker v3.5,cohere.rerank-v3-5:0,2,,
-us-west-2,,us-west-2|Amazon-rerank-v1.0,amazon.rerank-v1:0,1,,
-
-Embedding Models
-
+us-west-2,,us-west-2|Cohere Reranker v3.5,cohere.rerank-v3-5:0,2,
+us-west-2,,us-west-2|Amazon-rerank-v1.0,amazon.rerank-v1:0,1,
+,,,,,
+Embedding Models,,,,,
+,,,,,
 Region,Model,,,Price per million Input tokens,Price per Image (Thousands)
 N.Virginia,Titan Embeddings - Text,N.Virginia|Titan Embeddings - Text,amazon.titan-embed-text-v1,0.1,
 N.Virginia,Titan Embeddings V2 - Text,N.Virginia|Titan Embeddings V2 - Text,amazon.titan-embed-text-v2:0,0.02,

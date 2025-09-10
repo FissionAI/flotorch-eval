@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 class ToolCall(BaseModel):
     """A tool call made by an agent."""
-
+    id: str
     name: str = Field(description="Name of the tool called")
     arguments: Dict[str, Union[str, int, float, bool, List[str]]] = Field(
         description="Arguments passed to the tool"
@@ -25,6 +25,7 @@ class Message(BaseModel):
     role: str = Field(description="Role of the message sender (user/assistant/tool)")
     content: str = Field(description="Content of the message")
     tool_calls: Optional[List[ToolCall]] = Field(None, description="Tool calls made in this message")
+    tool_call_id: Optional[str] = None
     timestamp: Optional[datetime] = Field(None, description="When the message was sent")
 
 
@@ -117,31 +118,13 @@ class CostSummary(BaseModel):
     average_cost_per_call: float
     cost_breakdown: List[CostRecord]
 
-class LatencyBreakdownItem:
-    def __init__(self, step_name: str, latency_ms: float):
-        self.step_name = step_name
-        self.latency_ms = latency_ms
+class LatencyBreakdownItem(BaseModel):
+    """A Pydantic model for a single latency step."""
+    step_name: str
+    latency_ms: float
 
-    def to_dict(self) -> Dict:
-        return {
-            "step_name": self.step_name,
-            "latency_ms": self.latency_ms,
-        }
-
-class LatencySummary:
-    def __init__(
-        self,
-        total_latency_ms: float,
-        average_step_latency_ms: float,
-        latency_breakdown: List[LatencyBreakdownItem]
-    ):
-        self.total_latency_ms = total_latency_ms
-        self.average_step_latency_ms = average_step_latency_ms
-        self.latency_breakdown = latency_breakdown
-
-    def to_dict(self) -> Dict:
-        return {
-            "total_latency_ms": self.total_latency_ms,
-            "average_step_latency_ms": self.average_step_latency_ms,
-            "latency_breakdown": [item.to_dict() for item in self.latency_breakdown],
-        }
+class LatencySummary(BaseModel):
+    """A Pydantic model for the complete latency summary."""
+    total_latency_ms: float
+    average_step_latency_ms: float
+    latency_breakdown: List[LatencyBreakdownItem]

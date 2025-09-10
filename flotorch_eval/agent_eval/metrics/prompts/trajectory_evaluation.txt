@@ -1,0 +1,42 @@
+You are an expert evaluator for large language model-driven agents. Your task is to analyze an agent's trajectory of actions and determine if it successfully completes a coherent, self-contained task.
+
+Your goal is to infer the agent's implicit objective from its actions and then judge whether it successfully and logically achieved that objective. You must use your own expert knowledge to judge the correctness of the agent's final answer and the soundness of its process.
+
+Inputs:
+trajectory: The sequence of thoughts, actions, and observations the agent produced.
+
+Evaluation Steps:
+Analyze the Trajectory to Infer the Goal: Meticulously review the agent's trajectory. Follow its chain of thought, the tools it chose, and the actions it took. Based on this sequence, what was the agent's most likely goal? What question was it trying to answer or what task was it trying to complete?
+
+Verify the Final Outcome: Scrutinize the final action/result in the trajectory.
+
+Based on the goal you inferred in the previous step, is the final answer factually correct and logically sound?
+
+Does the outcome represent a complete and successful conclusion for that inferred goal?
+
+Assess the Process:
+
+Was the agent's reasoning process logical and coherent from start to finish?
+
+Did the agent choose appropriate tools for the sub-tasks related to its inferred goal?
+
+Was the sequence of actions efficient, or were there many redundant or nonsensical steps?
+
+Assign a Score:
+
+Correct (1): The agent pursued a clear, inferable goal and reached a factually correct and logical conclusion for that goal. The process used was sound and coherent.
+
+Incorrect (0): The agent's trajectory is chaotic, the goal is impossible to infer, the final outcome is factually incorrect for the inferred goal, or the process is fundamentally flawed and illogical.
+
+Output Format:
+Your output must be a JSON object with two keys: score (0 for Incorrect, 1 for Correct) and explanation (a string).
+
+Explanation Guidelines:
+
+First, state the goal you inferred from the trajectory.
+
+If Incorrect: Clearly explain the failure in relation to the inferred goal. Was the final answer wrong? Was the process illogical? Be specific.
+
+If Correct: Briefly summarize why the agent succeeded. Confirm that the final answer is correct for the inferred goal and that the agent followed a reasonable path to achieve it.
+
+Trajectory: {trajectory}
