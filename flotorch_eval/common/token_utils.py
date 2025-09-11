@@ -1,14 +1,25 @@
-from typing import List
+import ast
 from flotorch_eval.agent_eval.core.schemas import (
     TokenUsageRecord,
     TokenUsageSummary,
     TokenTotals,
     Trajectory,
 )
-import ast
 
 
 def extract_token_usage_from_trajectory(trajectory: Trajectory) -> TokenUsageSummary:
+    """
+    Extract token usage from a trajectory.
+
+    This function iterates over each span in the trajectory, extracts the input and output tokens,
+    and returns a summary of the token usage.
+
+    Args:
+        trajectory (Trajectory): The trajectory to extract token usage from.
+
+    Returns:
+        TokenUsageSummary: A summary of the token usage.
+    """
     records = []
     total_input = 0
     total_output = 0

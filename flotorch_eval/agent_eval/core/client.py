@@ -4,7 +4,6 @@ from flotorch_eval.agent_eval.metrics.base import LLMBaseEval
 from flotorch_eval.agent_eval.core.converter import TraceConverter
 from flotorch_eval.agent_eval.core.schemas import EvaluationResult, Trajectory
 
-
 class FlotorchEvalClient():
     """
     Client for evaluating agent trajectories using a set of metrics.
@@ -88,15 +87,18 @@ class FlotorchEvalClient():
         for metric in metrics:
             if metric.needs_llm:
                 metric.prepare_llm(self)
-                metric_params = metric.config.metric_params if metric.config else {}
-                async_tasks.append(metric.evaluate(trajectory, metric_params))
-            else:
-                metric_params = metric.config.metric_params if metric.config else {}
-                result = metric.evaluate(trajectory, metric_params)
-                sync_results.append(result)
 
-        # Run async metrics concurrently in parallel
-        async_results = await asyncio.gather(*async_tasks, return_exceptions=False)
+            metric_params = metric.config.metric_params if metric.config else {}
+            result_or_task = metric.evaluate(trajectory, metric_params) # evalaute can be sync or async;
+
+            if metric.run_async:
+                async_tasks.append(result_or_task)
+            else:
+                sync_results.append(result_or_task)
+
+        async_results = []
+        if async_tasks:
+            async_results = await asyncio.gather(*async_tasks, return_exceptions=False)
 
         all_scores = sync_results + list(async_results)
         return EvaluationResult(trajectory_id=trajectory.trace_id, scores=all_scores)

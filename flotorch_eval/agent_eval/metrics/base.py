@@ -1,6 +1,6 @@
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, Awaitable, TYPE_CHECKING, Union
 from pydantic import BaseModel, Field
 from flotorch.sdk.llm import FlotorchLLM
 from flotorch.sdk.utils.llm_utils import LLMResponse
@@ -68,8 +68,18 @@ class LLMBaseEval(ABC):
         """
         return False
 
+    @property
+    def run_async(self) -> bool:
+        """
+        Indicates whether this metric should run asynchronously.
+
+        Returns:
+            bool: True if the metric should run asynchronously, False otherwise.
+        """
+        return False
+
     @abstractmethod
-    async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
+    def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> Union[MetricResult, Awaitable[MetricResult]]:
         """
         Evaluate the metric on the given trajectory.
 

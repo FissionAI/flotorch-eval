@@ -34,6 +34,11 @@ class TrajectoryEvalWithLLM(LLMBaseEval):
         """Indicates that this metric requires an LLM."""
         return True
 
+    @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
+        return True
+
     async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
         """
         Evaluate the trajectory using an LLM.
@@ -66,6 +71,11 @@ class TrajectoryEvalWithLLMWithReference(LLMBaseEval):
     @property
     def needs_llm(self) -> bool:
         """Indicates that this metric requires an LLM."""
+        return True
+
+    @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
         return True
 
     async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
@@ -106,6 +116,11 @@ class ToolCallAccuracy(LLMBaseEval):
         """Indicates that this metric requires an LLM."""
         return True
 
+    @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
+        return True
+
     async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
         """
         Evaluate the tool call accuracy of the trajectory using an LLM.
@@ -138,6 +153,11 @@ class AgentGoalAccuracy(LLMBaseEval):
         """Indicates that this metric requires an LLM."""
         return True
     
+    @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
+        return True
+
     async def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> MetricResult:
         """
         Evaluate the agent's goal achievement accuracy using an LLM.

@@ -1,17 +1,28 @@
-from typing import List
 from flotorch_eval.agent_eval.core.schemas import TokenUsageSummary, CostSummary, CostRecord
-from flotorch_eval.common.cost_compute_utils import calculate_bedrock_inference_cost
+from flotorch_eval.common.cost_compute_utils import calculate_model_inference_cost
 
-def calculate_cost_from_tokens(token_summary: TokenUsageSummary, aws_region: str) -> CostSummary:
+async def calculate_cost_from_tokens(token_summary: TokenUsageSummary) -> CostSummary:
+    """
+    Calculate the total and average cost of LLM usage from a token usage summary.
+
+    This function iterates over each token usage record, computes the cost for each
+    using the model's pricing, and aggregates the results into a cost summary.
+
+    Args:
+        token_summary (TokenUsageSummary): Summary of token usage per span/model.
+
+    Returns:
+        CostSummary: An object containing the total cost, average cost per call,
+                     and a breakdown of costs per span/model.
+    """
     cost_breakdown = []
     total_cost = 0.0
 
     for record in token_summary.token_usage:
-        cost = calculate_bedrock_inference_cost(
+        cost = await calculate_model_inference_cost(
             record.input_tokens,
             record.output_tokens,
-            record.model,
-            aws_region
+            record.model
         )
 
         cost_breakdown.append(CostRecord(

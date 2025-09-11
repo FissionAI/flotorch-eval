@@ -18,6 +18,11 @@ class LatencyMetric(LLMBaseEval):
         return "latency_summary"
 
     @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
+        return False
+
+    @property
     def needs_llm(self) -> bool:
         """
         Indicates whether this metric requires an LLM.
