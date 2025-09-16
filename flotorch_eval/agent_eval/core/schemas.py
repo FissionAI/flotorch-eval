@@ -109,13 +109,13 @@ class CostRecord(BaseModel):
     model: str
     input_tokens: int
     output_tokens: int
-    cost: float
+    cost: str
 
 
 class CostSummary(BaseModel):
     """Aggregate and per-span cost results."""
-    total_cost: float
-    average_cost_per_call: float
+    total_cost: str
+    average_cost_per_call: str
     cost_breakdown: List[CostRecord]
 
 class LatencyBreakdownItem(BaseModel):

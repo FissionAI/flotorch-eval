@@ -27,8 +27,8 @@ def extract_token_usage_from_trajectory(trajectory: Trajectory) -> TokenUsageSum
     for span in trajectory.spans:
         attributes = span.attributes
 
-        input_tokens = attributes.get("gen_ai.request.token_count")
-        output_tokens = attributes.get("gen_ai.response.token_count")
+        input_tokens = attributes.get("gen_ai.usage.input_tokens")
+        output_tokens = attributes.get("gen_ai.usage.output_tokens")
 
         # Get the model from response
         model = None

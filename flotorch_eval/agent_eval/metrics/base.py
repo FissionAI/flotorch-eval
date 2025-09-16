@@ -18,6 +18,7 @@ class MetricConfig(BaseModel):
         default_factory=dict, description="Metric-specific parameters"
     )
 
+
 class LLMBaseEval(ABC):
     """
     Abstract base class for all metric evaluators, including those that use LLMs.
@@ -79,7 +80,9 @@ class LLMBaseEval(ABC):
         return False
 
     @abstractmethod
-    def evaluate(self, trajectory: Trajectory, metric_params: Dict[str, Any]) -> Union[MetricResult, Awaitable[MetricResult]]:
+    def evaluate(
+        self, trajectory: Trajectory, metric_params: Dict[str, Any]
+    ) -> Union[MetricResult, Awaitable[MetricResult]]:
         """
         Evaluate the metric on the given trajectory.
 
@@ -99,11 +102,19 @@ class LLMBaseEval(ABC):
         Args:
             client (FlotorchEvalClient): The evaluation client.
         """
-        llm_to_use = self.llm if self.llm is not None else client.default_evaluator
+        if self.llm is not None:
+            llm_to_use = self.llm
+        else:
+            if client.default_evaluator is not None:
+                llm_to_use = client.default_evaluator
+            else:
+                raise ValueError(
+                    "No evaluator set. Initialize the client with a default evaluator model "
+                    "via constructor or set_default_evaluator, or provide a model to the metric."
+                )
+
         self.llm_evaluator = FlotorchLLM(
-            model_id=llm_to_use,
-            api_key=client.api_key,
-            base_url=client.base_url
+            model_id=llm_to_use, api_key=client.api_key, base_url=client.base_url
         )
 
     def _parse_response(self, response: LLMResponse) -> MetricResult:
@@ -121,11 +132,7 @@ class LLMBaseEval(ABC):
         result = MetricResult(
             name=self.name,
             score=parsed_content.get("score", 0.0),
-            details={
-                "details": parsed_content.get(
-                    "details", "No details provided"
-                )
-            },
+            details={"details": parsed_content.get("details", "No details provided")},
         )
         return result
 
@@ -147,10 +154,12 @@ class LLMBaseEval(ABC):
         try:
             prompt = prompt.format(**kwargs)
         except Exception as e:
-            raise ValueError(f"Error loading prompt: {e}")
+            raise ValueError(f"Error loading prompt: {e}") from e
         return prompt
 
-    async def _call_llm(self, prompt: str, response_format: Optional[Dict[str, Any]] = None) -> LLMResponse:
+    async def _call_llm(
+        self, prompt: str, response_format: Optional[Dict[str, Any]] = None
+    ) -> LLMResponse:
         """
         Call the LLM asynchronously with the given prompt.
 
@@ -162,5 +171,7 @@ class LLMBaseEval(ABC):
             LLMResponse: The response from the LLM.
         """
         messages = [{"role": "user", "content": prompt}]
-        response = await self.llm_evaluator.ainvoke(messages, response_format=response_format)
+        response = await self.llm_evaluator.ainvoke(
+            messages, response_format=response_format
+        )
         return response

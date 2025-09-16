@@ -30,14 +30,15 @@ async def calculate_cost_from_tokens(token_summary: TokenUsageSummary) -> CostSu
             model=record.model,
             input_tokens=record.input_tokens,
             output_tokens=record.output_tokens,
-            cost=round(cost, 6)
+            cost=f"{cost:.6f}"
         ))
         total_cost += cost
 
     average_cost = total_cost / len(cost_breakdown) if cost_breakdown else 0.0
 
     return CostSummary(
-        total_cost=round(total_cost, 6),
-        average_cost_per_call=round(average_cost, 6),
+        total_cost=f"{total_cost:.6f}",
+        average_cost_per_call=f"{average_cost:.6f}",
         cost_breakdown=cost_breakdown
     )
+    
