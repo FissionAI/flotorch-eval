@@ -77,6 +77,7 @@ class FlotorchEvalClient:
         trace: Dict[str, Any],
         metrics: Optional[List[LLMBaseEval]] = None,
         reference: Dict[str, Any] = None,
+        reference_trace_id: Optional[str] = None
     ) -> EvaluationResult:
         """
         Evaluate a trace using the provided metrics.
@@ -92,6 +93,25 @@ class FlotorchEvalClient:
             ValueError: If no metrics or trace are provided.
             RuntimeError: If evaluation fails.
         """
+        # Check for conflicting arguments
+        if reference and reference_trace_id:
+            raise ValueError("Provide either 'reference' or 'reference_trace_id', not both.")
+
+        # Create reference from trace id if one is provided
+        if reference_trace_id:
+            print(f"Fetching reference trace with ID: {reference_trace_id}")
+            try:
+                reference_trace_data = self.fetch_traces(trace_id=reference_trace_id)
+                if not reference_trace_data:
+                    raise ValueError(f"Could not fetch or find trace for reference ID: {reference_trace_id}")
+                
+                converter = TraceConverter()
+                reference_obj = converter.to_reference(reference_trace_data)
+                reference = reference_obj.model_dump()
+                print("Successfully converted trace to reference format.")
+            except Exception as e:
+                print(f"Failed to create reference from trace ID '{reference_trace_id}': {e}")
+                raise
         try:
             if metrics is None:
                 if self.default_evaluator is not None:

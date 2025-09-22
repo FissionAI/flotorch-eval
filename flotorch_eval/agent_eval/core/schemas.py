@@ -3,7 +3,7 @@ Core schemas for agent evaluation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +60,26 @@ class Trajectory(BaseModel):
     trace_id: str = Field(description="Unique identifier for the trajectory")
     messages: List[Message] = Field(description="Messages in the trajectory")
     spans: List[Span] = Field(description="Spans in the trajectory")
+    
+class ReferenceToolCall(BaseModel):
+    """A representation of an expected tool call for a reference trajectory."""
+    name: str = Field(description="The name of the tool or function that should be called.")
+    arguments: Dict[str, Any] = Field(description="The dictionary of arguments expected to be passed to the tool.")
+
+class ReferenceTrajectory(BaseModel):
+    """
+    Defines the "golden path" for an agent interaction, serving as a reference for evaluation.
+    This can be created manually or generated from an existing trace.
+    """
+    input: str = Field(description="The initial user input or prompt that starts the trajectory.")
+    expected_tool_calls: List[ReferenceToolCall] = Field(
+        default_factory=list,
+        description="An ordered list of tool calls that the agent is expected to make."
+    )
+    final_response: Optional[str] = Field(
+        default=None,
+        description="The final text response expected from the agent after all tool calls are complete."
+    )
 
 
 class MetricResult(BaseModel):
