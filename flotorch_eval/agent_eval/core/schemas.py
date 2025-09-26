@@ -5,7 +5,7 @@ Core schemas for agent evaluation.
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ToolCall(BaseModel):
@@ -61,26 +61,44 @@ class Trajectory(BaseModel):
     messages: List[Message] = Field(description="Messages in the trajectory")
     spans: List[Span] = Field(description="Spans in the trajectory")
     
+
+# Reference Trajectory structure
 class ReferenceToolCall(BaseModel):
-    """A representation of an expected tool call for a reference trajectory."""
+    """A simplified representation of an expected tool call for a reference trajectory."""
     name: str = Field(description="The name of the tool or function that should be called.")
     arguments: Dict[str, Any] = Field(description="The dictionary of arguments expected to be passed to the tool.")
 
-class ReferenceTrajectory(BaseModel):
+class ReferenceStep(BaseModel):
     """
-    Defines the "golden path" for an agent interaction, serving as a reference for evaluation.
-    This can be created manually or generated from an existing trace.
+    Represents a single step in the agent's reasoning process,
+    containing the thought process and the resulting action.
     """
-    input: str = Field(description="The initial user input or prompt that starts the trajectory.")
-    expected_tool_calls: List[ReferenceToolCall] = Field(
-        default_factory=list,
-        description="An ordered list of tool calls that the agent is expected to make."
+    thought: str = Field(description="The reasoning or thought process of the agent that leads to the action.")
+    tool_call: Optional[ReferenceToolCall] = Field(
+        default=None,
+        description="The tool call action that results from the thought."
     )
     final_response: Optional[str] = Field(
         default=None,
-        description="The final text response expected from the agent after all tool calls are complete."
+        description="The final text response action that results from the thought."
     )
 
+    @model_validator(mode='after')
+    def check_exactly_one_action(self) -> 'ReferenceStep':
+        """Ensures that each step has exactly one action (either a tool_call or a final_response)."""
+        actions_count = sum(1 for action in [self.tool_call, self.final_response] if action is not None)
+        if actions_count != 1:
+            raise ValueError("A ReferenceStep must contain exactly one action: either 'tool_call' or 'final_response'.")
+        return self
+
+class ReferenceTrajectory(BaseModel):
+    """
+    Defines the "golden path" for an agent interaction, including the reasoning at each step.
+    """
+    input: str = Field(description="The initial user input or prompt that starts the trajectory.")
+    expected_steps: List[ReferenceStep] = Field(
+        description="An ordered list of reasoning steps (thought and action) the agent should take."
+    )
 
 class MetricResult(BaseModel):
     """Result from a single metric evaluation."""

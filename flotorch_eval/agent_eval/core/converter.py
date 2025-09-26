@@ -13,7 +13,16 @@ from datetime import datetime
 import ast
 import re
 from typing import Dict, List, Any
-from flotorch_eval.agent_eval.core.schemas import Message, Span, SpanEvent, ToolCall, Trajectory, ReferenceTrajectory, ReferenceToolCall
+from flotorch_eval.agent_eval.core.schemas import (
+    Message,
+    Span,
+    SpanEvent,
+    ToolCall,
+    Trajectory,
+    ReferenceTrajectory,
+    ReferenceStep,
+    ReferenceToolCall
+)
 
 class TraceConverter:
     """
@@ -267,16 +276,8 @@ class TraceConverter:
     
     def to_reference(self, trace_data: Dict[str, Any]) -> ReferenceTrajectory:
         """
-        Converts a full trace data object into a simplified ReferenceTrajectory.
-
-        This method extracts the initial user input, all successful tool calls,
-        and the final assistant response to create a "golden path" reference.
-
-        Args:
-            trace_data (Dict[str, Any]): The OpenTelemetry trace data as a dictionary.
-
-        Returns:
-            ReferenceTrajectory: The simplified reference object.
+        Converts a full trace data object into a detailed ReferenceTrajectory,
+        including a generated "thought" for each step.
         """
         trajectory = self.from_spans(trace_data)
 
@@ -292,26 +293,38 @@ class TraceConverter:
         if not initial_input:
              raise ValueError("Cannot create a reference from a trace with no user input.")
 
-        # Collect all assistant tool calls in order
-        tool_calls = []
+        steps: List[ReferenceStep] = []
+        
+        # Collect tool call steps
         for msg in trajectory.messages:
             if msg.role == 'assistant' and msg.tool_calls:
                 for tc in msg.tool_calls:
-                    tool_calls.append(
-                        ReferenceToolCall(name=tc.name, arguments=tc.arguments)
+                    thought = f"The agent determined that it needed to use the '{tc.name}' tool to proceed."
+                    steps.append(
+                        ReferenceStep(
+                            thought=thought,
+                            tool_call=ReferenceToolCall(name=tc.name, arguments=tc.arguments)
+                        )
                     )
 
-        # Find the final assistant text response
-        final_response = None
-        # Iterate backwards to find the last assistant message with content
+        # Find and add the final response step
         for msg in reversed(trajectory.messages):
+            # Check for the final assistant message with content and no tool calls
             if msg.role == 'assistant' and msg.content and not msg.tool_calls:
-                final_response = msg.content
+                thought = "The agent synthesized the available information to formulate a final answer."
+                steps.append(
+                    ReferenceStep(
+                        thought=thought,
+                        final_response=msg.content
+                    )
+                )
+                # Once the last response is found, exit the loop
                 break
-        
-        # 3. Assemble the ReferenceTrajectory
+
+        if not steps:
+            raise ValueError("Could not extract any meaningful steps (tool calls or final response) from the trace.")
+
         return ReferenceTrajectory(
             input=initial_input,
-            expected_tool_calls=tool_calls,
-            final_response=final_response,
+            expected_steps=steps,
         )
