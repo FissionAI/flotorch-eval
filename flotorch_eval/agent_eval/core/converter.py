@@ -10,9 +10,8 @@ conversation flow, and handles tool call associations.
 """
 
 from datetime import datetime
-import ast
-import re
-from typing import Dict, List, Any
+import json
+from typing import Dict, List, Any, Optional
 from flotorch_eval.agent_eval.core.schemas import (
     Message,
     Span,
@@ -42,11 +41,6 @@ class TraceConverter:
 
         Returns:
             Trajectory: The reconstructed agent trajectory, including messages and spans.
-
-        This method parses the nested OTel structure and extracts span attributes
-        to reconstruct the agent's conversation flow. It primarily uses the final
-        LLM call's attributes, which contain the full conversation history, to
-        build the message list accurately and avoid duplication.
         """
         resource_spans = trace_data.get("resourceSpans", [])
         if not resource_spans:
@@ -59,7 +53,6 @@ class TraceConverter:
 
         if not raw_spans:
             return Trajectory(trace_id="", messages=[], spans=[])
-            
         trace_id = raw_spans[0].get("traceId", "")
 
         internal_spans: List[Span] = []
@@ -72,7 +65,6 @@ class TraceConverter:
                 )
                 for evt in span_dict.get("events", [])
             ]
-            
             span = Span(
                 span_id=span_dict.get("spanId", ""),
                 trace_id=trace_id,
@@ -86,154 +78,130 @@ class TraceConverter:
             internal_spans.append(span)
 
         sorted_spans = sorted(internal_spans, key=lambda s: s.start_time)
-        
         messages: List[Message] = []
         tool_calls_map: Dict[str, ToolCall] = {}
 
-        # Find all LLM call spans that have conversation history
-        llm_spans = [
-            s for s in sorted_spans
-            if "gen_ai.request.messages" in s.attributes and s.attributes.get("gen_ai.operation.name") in ("chat", "invoke_agent")
-        ]
+        # Iterate through all spans and their events to build the conversation chronologically
+        for span in sorted_spans:
+            # Sort events within the span to ensure correct order
+            sorted_events = sorted(span.events, key=lambda e: e.timestamp)
+            for event in sorted_events:
+                msg = self._parse_message_from_event(event, tool_calls_map)
+                if msg:
+                    messages.append(msg)
 
-        if not llm_spans:
-            return Trajectory(trace_id=trace_id, messages=[], spans=sorted_spans)
-
-        # The last LLM span contains the most complete history and the final response
-        last_llm_span = llm_spans[-1]
-
-        # 1. Process the conversation history from the last LLM call's request
-        history_messages_str = last_llm_span.attributes.get("gen_ai.request.messages")
-        if history_messages_str:
-            try:
-                history_messages_data = ast.literal_eval(history_messages_str)
-                for msg_data in history_messages_data:
-                    self._parse_and_append_message(
-                        msg_data,
-                        messages,
-                        tool_calls_map,
-                        # Use the start time of the span as an approximation for historical message timestamps
-                        timestamp=last_llm_span.start_time
-                    )
-            except (ValueError, SyntaxError) as e:
-                print(f"Warning: Could not parse conversation history: {e}")
-                pass
-
-        # 2. Process the final response from the last LLM call span
-        final_content = last_llm_span.attributes.get("gen_ai.response.content", "")
-        final_tool_calls: List[ToolCall] = self._parse_tool_calls_from_response(last_llm_span)
-
-        # Link any newly created tool calls for potential output processing
-        for tc in final_tool_calls:
-            if tc.id:
-                tool_calls_map[tc.id] = tc
-
-        # Add the final assistant message
-        if final_content or final_tool_calls:
-            messages.append(Message(
-                role="assistant",
-                content=final_content,
-                timestamp=last_llm_span.end_time,
-                tool_calls=final_tool_calls,
-            ))
-
-        # Sort all messages by timestamp to ensure correct conversation order
+        # Sort all messages by timestamp to ensure correct final conversation order
         sorted_messages = sorted(messages, key=lambda m: m.timestamp)
+
+        merged_messages: List[Message] = []
+        i = 0
+        while i < len(sorted_messages):
+            current_msg = sorted_messages[i]
+
+            if (current_msg.role == 'assistant' and
+                current_msg.content and
+                not current_msg.tool_calls and
+                (i + 1) < len(sorted_messages)):
+                
+                next_msg = sorted_messages[i+1]
+
+                if (next_msg.role == 'assistant' and
+                    (not next_msg.content or next_msg.content == "") and
+                    next_msg.tool_calls and
+                    (next_msg.timestamp - current_msg.timestamp).total_seconds() < 0.1):
+                    
+                    current_msg.tool_calls = next_msg.tool_calls
+
+                    merged_messages.append(current_msg)
+                    i += 2
+                    continue
+            merged_messages.append(current_msg)
+            i += 1
 
         return Trajectory(
             trace_id=trace_id,
-            messages=sorted_messages,
+            messages=merged_messages,
             spans=sorted_spans,
         )
 
-    def _parse_and_append_message(
+    def _parse_message_from_event(
         self,
-        msg_data: Dict[str, Any],
-        messages: List[Message],
-        tool_calls_map: Dict[str, ToolCall],
-        timestamp: datetime
-    ):
-        """Parses a single message dictionary and updates the messages list and tool map."""
-        role = msg_data.get("role")
-        content = msg_data.get("content", "")
+        event: SpanEvent,
+        tool_calls_map: Dict[str, ToolCall]
+    ) -> Optional[Message]:
+        """Parses a single SpanEvent to create a Message object if applicable."""
+        
+        attrs = event.attributes
+        role = attrs.get("message.role")
+        content = attrs.get("message.content", "")
+        timestamp = event.timestamp
+        
+        # 1. User Message
+        if role == "user":
+            return Message(role="user", content=content, timestamp=timestamp)
 
-        if role in ("user", "system"):
-            messages.append(Message(role=role, content=content, timestamp=timestamp))
-
-        elif role == "assistant":
+        # 2. Assistant Message (can be text or tool call)
+        if event.name == "event_choice":
             parsed_tool_calls = []
-            if "tool_calls" in msg_data:
-                for tc_data in msg_data["tool_calls"]:
-                    function_data = tc_data.get("function", {})
+            tool_calls_str = attrs.get("message.tool_calls")
+            
+            if tool_calls_str:
+                try:
+                    tool_calls_data = json.loads(tool_calls_str)
+                    for tc_data in tool_calls_data:
+                        function_data = tc_data.get("function", {})
+                        arguments = function_data.get("arguments", {})
+                        
+                        if isinstance(arguments, str):
+                            try:
+                                arguments = json.loads(arguments)
+                            except json.JSONDecodeError:
+                                arguments = {"raw": arguments}
+                        
+                        tool_call = ToolCall(
+                            id=tc_data.get("id"),
+                            name=function_data.get("name", ""),
+                            arguments=arguments,
+                            timestamp=timestamp,
+                        )
+                        parsed_tool_calls.append(tool_call)
+                        if tool_call.id:
+                            tool_calls_map[tool_call.id] = tool_call
+                except (json.JSONDecodeError, TypeError) as e:
+                    print(f"Warning: Could not parse tool calls from event: {e}")
+            
+            if not content and not parsed_tool_calls:
+                return None
 
-                    try:
-                        # Arguments can be a stringified dict/json
-                        arguments = ast.literal_eval(function_data.get("arguments", "{}"))
-                    except (ValueError, SyntaxError):
-                        arguments = {"raw": str(function_data.get("arguments"))}
+            return Message(
+                role="assistant",
+                content=content, 
+                timestamp=timestamp, 
+                tool_calls=parsed_tool_calls or None
+            )
 
-                    tool_call = ToolCall(
-                        id=tc_data.get("id"),
-                        name=function_data.get("name", ""),
-                        arguments=arguments,
-                        timestamp=timestamp,
-                    )
-                    parsed_tool_calls.append(tool_call)
-                    if tool_call.id:
-                        tool_calls_map[tool_call.id] = tool_call
-
-            messages.append(Message(
-                role="assistant", content=content, timestamp=timestamp, tool_calls=parsed_tool_calls
-            ))
-
-        elif role == "tool":
-            tool_call_id = msg_data.get("tool_call_id")
-
+        # 3. Tool Message (output from a tool)
+        if role == "tool":
+            tool_call_id = attrs.get("tool.call.id")
+            
             try:
-                # Tool output might be a stringified dict with a 'result' key
-                tool_output_dict = ast.literal_eval(content)
+                tool_output_dict = json.loads(content)
                 tool_output = tool_output_dict.get("result", content)
-            except (ValueError, SyntaxError):
+            except (json.JSONDecodeError, TypeError):
                 tool_output = content
 
             if tool_call_id and tool_call_id in tool_calls_map:
-                tool_calls_map[tool_call_id].output = tool_output
+                tool_calls_map[tool_call_id].output = str(tool_output)
 
-            messages.append(Message(
-                role="tool", content=tool_output, timestamp=timestamp, tool_call_id=tool_call_id
-            ))
+            return Message(
+                role="tool", 
+                content=str(tool_output), 
+                timestamp=timestamp, 
+                tool_call_id=tool_call_id
+            )
+            
+        return None
 
-    def _parse_tool_calls_from_response(self, span: Span) -> List[ToolCall]:
-        """Extracts tool calls from the 'gen_ai.response.full' attribute of a span."""
-        full_response_str = span.attributes.get("gen_ai.response.full", "")
-        if not full_response_str:
-            return []
-
-        parsed_tool_calls = []
-        # Use regex to find the tool_calls list in the string representation
-        match = re.search(r"'tool_calls':\s*(\[.*?\])", full_response_str.replace('\\', ''))
-        if match:
-            tool_calls_repr = match.group(1)
-            try:
-                tool_calls_data = ast.literal_eval(tool_calls_repr)
-                for tc_data in tool_calls_data:
-                    function_data = tc_data.get("function", {})
-                    arguments_raw = function_data.get("arguments", {})
-
-                    # Arguments can be a dict or a stringified dict
-                    arguments = arguments_raw if isinstance(arguments_raw, dict) else ast.literal_eval(str(arguments_raw))
-
-                    tool_call = ToolCall(
-                        id=tc_data.get("id"),
-                        name=function_data.get("name", ""),
-                        arguments=arguments,
-                        timestamp=span.end_time,
-                    )
-                    parsed_tool_calls.append(tool_call)
-            except (ValueError, SyntaxError) as e:
-                print(f"Warning: Could not parse tool calls from full response: {e}")
-                pass
-        return parsed_tool_calls
 
     def _convert_otel_attributes(
         self, attributes: List[Dict[str, Any]]
@@ -266,7 +234,7 @@ class TraceConverter:
             elif "boolValue" in value_obj:
                 result[key] = value_obj["boolValue"]
             elif "arrayValue" in value_obj:
-                result[key] = value_obj["arrayValue"]
+                result[key] = [v.get('stringValue') for v in value_obj["arrayValue"].get('values', [])]
             elif "kvlistValue" in value_obj:
                 result[key] = self._convert_otel_attributes(value_obj.get('values', []))
             else:
@@ -278,6 +246,7 @@ class TraceConverter:
         """
         Converts a full trace data object into a detailed ReferenceTrajectory,
         including a generated "thought" for each step.
+        (This method does not need changes as it depends on the output of from_spans)
         """
         trajectory = self.from_spans(trace_data)
 
@@ -298,8 +267,9 @@ class TraceConverter:
         # Collect tool call steps
         for msg in trajectory.messages:
             if msg.role == 'assistant' and msg.tool_calls:
+                # Add assistant's thought/content if it exists before the tool call
+                thought = msg.content or "The agent determined it needed to use a tool."
                 for tc in msg.tool_calls:
-                    thought = f"The agent determined that it needed to use the '{tc.name}' tool to proceed."
                     steps.append(
                         ReferenceStep(
                             thought=thought,
@@ -309,7 +279,6 @@ class TraceConverter:
 
         # Find and add the final response step
         for msg in reversed(trajectory.messages):
-            # Check for the final assistant message with content and no tool calls
             if msg.role == 'assistant' and msg.content and not msg.tool_calls:
                 thought = "The agent synthesized the available information to formulate a final answer."
                 steps.append(
@@ -318,7 +287,6 @@ class TraceConverter:
                         final_response=msg.content
                     )
                 )
-                # Once the last response is found, exit the loop
                 break
 
         if not steps:

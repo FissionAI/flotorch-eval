@@ -31,21 +31,9 @@ def extract_token_usage_from_trajectory(trajectory: Trajectory) -> TokenUsageSum
         output_tokens = attributes.get("gen_ai.usage.output_tokens")
 
         # Get the model from response
-        model = None
-        model_response = attributes.get("gen_ai.response.full")
-        if model_response is not None:
-            if model_response.startswith("metadata="):
-                model_response = model_response[len("metadata="):]
-
-            # Sometimes there's a trailing ` content=...`, remove it
-            if " content=" in model_response:
-                model_response = model_response.split(" content=")[0].strip()
-
-            # 2. Parse into Python dict safely
-            parsed = ast.literal_eval(model_response)
-
-            # 3. Extract model
-            model = parsed["raw_response"]["model"]
+        model = attributes.get("gen_ai.response.model")
+        if not model:
+            model = attributes.get("gen_ai.request.model")
 
         if input_tokens is not None and output_tokens is not None and model:
             input_tokens = int(input_tokens)
