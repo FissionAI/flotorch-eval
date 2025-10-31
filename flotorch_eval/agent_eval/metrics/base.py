@@ -8,7 +8,7 @@ from flotorch_eval.agent_eval.core.schemas import MetricResult, Trajectory
 from flotorch_eval.agent_eval.metrics.prompt_manager import PromptManager
 
 if TYPE_CHECKING:
-    from flotorch_eval.agent_eval.core.client import FlotorchEvalClient
+    from flotorch_eval.agent_eval.core.client import AgentEvaluator
 
 
 class MetricConfig(BaseModel):
@@ -29,7 +29,7 @@ class LLMBaseEval(ABC):
     Attributes:
         llm (Optional[str]): The LLM model identifier to use for evaluation.
         config (Optional[MetricConfig]): Configuration object containing metric parameters.
-        client (Optional[FlotorchEvalClient]): Reference to the evaluation client.
+        client (Optional[AgentEvaluator]): Reference to the evaluation client.
         llm_evaluator (Optional[FlotorchLLM]): The LLM evaluator instance.
     """
 
@@ -95,12 +95,12 @@ class LLMBaseEval(ABC):
         """
         pass
 
-    def prepare_llm(self, client: "FlotorchEvalClient") -> None:
+    def prepare_llm(self, client: "AgentEvaluator") -> None:
         """
         Prepare the LLM evaluator using the provided client.
 
         Args:
-            client (FlotorchEvalClient): The evaluation client.
+            client (AgentEvaluator): The evaluation client.
         """
         if self.llm is not None:
             llm_to_use = self.llm
