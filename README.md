@@ -255,6 +255,51 @@ for trace_id in trace_ids:
 
 ## 🔧 Configuration
 
+### Gateway Metrics (Latency, Cost, Token Usage)
+
+Gateway metrics automatically track performance and usage statistics from your LLM calls. To enable these metrics, pass the response headers from FlotorchLLM as metadata:
+
+```python
+from flotorch.sdk.llm import FlotorchLLM
+from flotorch_eval.llm_eval import LLMEvaluator, EvaluationItem
+
+# Initialize FlotorchLLM
+llm = FlotorchLLM(
+    model_id="flotorch/gpt-4",
+    api_key="your-api-key",
+    base_url="flotorch-base-url"
+)
+
+# Make LLM call with return_headers=True to get metadata
+response, headers = llm.invoke(
+    messages=[{"role": "user", "content": "What is machine learning?"}],
+    return_headers=True  # This returns headers containing latency, cost, and token info
+)
+
+# Create evaluation item with headers as metadata
+eval_item = EvaluationItem(
+    question="What is machine learning?",
+    generated_answer=response.content,
+    expected_answer="Machine learning is...",
+    context=["Context documents..."],
+    metadata=headers  # Pass headers directly as metadata
+)
+
+# Evaluate - Gateway metrics will be automatically computed
+evaluator = LLMEvaluator(
+    api_key="your-api-key",
+    base_url="flotorch-base-url",
+    inferencer_model="flotorch/gpt-4",
+    embedding_model="flotorch/embedding-model"
+)
+
+results = evaluator.evaluate(data=[eval_item])
+
+```
+The results will include the gateway metrics total cost, average latency and total tokens
+
+**Note:** Gateway metrics are computed automatically when metadata is present. No additional configuration is required.
+
 ### Metric Arguments
 
 Customize metric thresholds and behavior:
