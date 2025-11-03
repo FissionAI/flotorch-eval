@@ -1,39 +1,46 @@
-from typing import Optional
-from flotorch_eval.agent_eval.metrics.base import BaseMetric, MetricConfig
+from flotorch_eval.agent_eval.metrics.base import MetricConfig
 from flotorch_eval.agent_eval.core.schemas import MetricResult, Trajectory
 from flotorch_eval.common.cost_utils import calculate_cost_from_tokens
 from flotorch_eval.common.token_utils import extract_token_usage_from_trajectory
+from flotorch_eval.agent_eval.metrics.base import LLMBaseEval
 
-class UsageMetric(BaseMetric):
-    """Metric to compute cost/token of LLM usage per span and overall."""
+class UsageMetric(LLMBaseEval):
+    """
+    Metric to compute cost and token usage of LLM usage per span and overall.
 
-    requires_llm = False
+    This metric extracts token usage from the provided trajectory, estimates the cost using model pricing,
+    and returns a summary including total cost, average cost per call, and a breakdown per model/span.
+    """
 
     @property
     def name(self) -> str:
+        """Returns the name of the metric."""
         return "usage_summary"
 
-    def _setup(self) -> None:
-        """
-        Validate required configuration like AWS region.
-        """
-        if not self.config or not self.config.metric_params.get("aws_region"):
-            raise ValueError("CostMetric requires 'aws_region' in metric_params")
-        self.aws_region = self.config.metric_params["aws_region"]
+    @property
+    def needs_llm(self) -> bool:
+        """Indicates whether this metric requires an LLM."""
+        return False
 
-    async def compute(self, trajectory: Trajectory) -> MetricResult:
+    @property
+    def run_async(self) -> bool:
+        """Indicates that this metric should run asynchronously."""
+        return True
+
+    async def evaluate(self, trajectory: Trajectory, metric_params: MetricConfig = None) -> MetricResult:
         """
-        Compute cost estimation for the trajectory using Bedrock pricing.
+        Compute cost estimation for the trajectory using model pricing.
 
         Args:
-            trajectory: The trajectory to evaluate.
+            trajectory (Trajectory): The trajectory to evaluate.
 
         Returns:
-            MetricResult with cost summary.
+            MetricResult: The result containing cost summary.
         """
+
         token_summary = extract_token_usage_from_trajectory(trajectory)
 
-        cost_summary = calculate_cost_from_tokens(token_summary, aws_region=self.aws_region)
+        cost_summary = await calculate_cost_from_tokens(token_summary)
 
         return MetricResult(
             name=self.name,

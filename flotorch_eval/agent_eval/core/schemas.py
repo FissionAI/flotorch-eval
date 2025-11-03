@@ -3,14 +3,14 @@ Core schemas for agent evaluation.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ToolCall(BaseModel):
     """A tool call made by an agent."""
-
+    id: str
     name: str = Field(description="Name of the tool called")
     arguments: Dict[str, Union[str, int, float, bool, List[str]]] = Field(
         description="Arguments passed to the tool"
@@ -25,6 +25,7 @@ class Message(BaseModel):
     role: str = Field(description="Role of the message sender (user/assistant/tool)")
     content: str = Field(description="Content of the message")
     tool_calls: Optional[List[ToolCall]] = Field(None, description="Tool calls made in this message")
+    tool_call_id: Optional[str] = None
     timestamp: Optional[datetime] = Field(None, description="When the message was sent")
 
 
@@ -59,7 +60,45 @@ class Trajectory(BaseModel):
     trace_id: str = Field(description="Unique identifier for the trajectory")
     messages: List[Message] = Field(description="Messages in the trajectory")
     spans: List[Span] = Field(description="Spans in the trajectory")
+    
 
+# Reference Trajectory structure
+class ReferenceToolCall(BaseModel):
+    """A simplified representation of an expected tool call for a reference trajectory."""
+    name: str = Field(description="The name of the tool or function that should be called.")
+    arguments: Dict[str, Any] = Field(description="The dictionary of arguments expected to be passed to the tool.")
+
+class ReferenceStep(BaseModel):
+    """
+    Represents a single step in the agent's reasoning process,
+    containing the thought process and the resulting action.
+    """
+    thought: str = Field(description="The reasoning or thought process of the agent that leads to the action.")
+    tool_call: Optional[ReferenceToolCall] = Field(
+        default=None,
+        description="The tool call action that results from the thought."
+    )
+    final_response: Optional[str] = Field(
+        default=None,
+        description="The final text response action that results from the thought."
+    )
+
+    @model_validator(mode='after')
+    def check_exactly_one_action(self) -> 'ReferenceStep':
+        """Ensures that each step has exactly one action (either a tool_call or a final_response)."""
+        actions_count = sum(1 for action in [self.tool_call, self.final_response] if action is not None)
+        if actions_count != 1:
+            raise ValueError("A ReferenceStep must contain exactly one action: either 'tool_call' or 'final_response'.")
+        return self
+
+class ReferenceTrajectory(BaseModel):
+    """
+    Defines the "golden path" for an agent interaction, including the reasoning at each step.
+    """
+    input: str = Field(description="The initial user input or prompt that starts the trajectory.")
+    expected_steps: List[ReferenceStep] = Field(
+        description="An ordered list of reasoning steps (thought and action) the agent should take."
+    )
 
 class MetricResult(BaseModel):
     """Result from a single metric evaluation."""
@@ -108,40 +147,22 @@ class CostRecord(BaseModel):
     model: str
     input_tokens: int
     output_tokens: int
-    cost: float
+    cost: str
 
 
 class CostSummary(BaseModel):
     """Aggregate and per-span cost results."""
-    total_cost: float
-    average_cost_per_call: float
+    total_cost: str
+    average_cost_per_call: str
     cost_breakdown: List[CostRecord]
 
-class LatencyBreakdownItem:
-    def __init__(self, step_name: str, latency_ms: float):
-        self.step_name = step_name
-        self.latency_ms = latency_ms
+class LatencyBreakdownItem(BaseModel):
+    """A Pydantic model for a single latency step."""
+    step_name: str
+    latency_ms: float
 
-    def to_dict(self) -> Dict:
-        return {
-            "step_name": self.step_name,
-            "latency_ms": self.latency_ms,
-        }
-
-class LatencySummary:
-    def __init__(
-        self,
-        total_latency_ms: float,
-        average_step_latency_ms: float,
-        latency_breakdown: List[LatencyBreakdownItem]
-    ):
-        self.total_latency_ms = total_latency_ms
-        self.average_step_latency_ms = average_step_latency_ms
-        self.latency_breakdown = latency_breakdown
-
-    def to_dict(self) -> Dict:
-        return {
-            "total_latency_ms": self.total_latency_ms,
-            "average_step_latency_ms": self.average_step_latency_ms,
-            "latency_breakdown": [item.to_dict() for item in self.latency_breakdown],
-        }
+class LatencySummary(BaseModel):
+    """A Pydantic model for the complete latency summary."""
+    total_latency_ms: float
+    average_step_latency_ms: float
+    latency_breakdown: List[LatencyBreakdownItem]

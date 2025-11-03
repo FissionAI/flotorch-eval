@@ -2,7 +2,6 @@
 Agent evaluation package.
 """
 
-from flotorch_eval.agent_eval.core.evaluator import Evaluator
 from flotorch_eval.agent_eval.core.schemas import (
     EvaluationResult,
     Message,
@@ -13,16 +12,14 @@ from flotorch_eval.agent_eval.core.schemas import (
     Trajectory,
 )
 from flotorch_eval.agent_eval.core.converter import TraceConverter
-from flotorch_eval.agent_eval.metrics.base import BaseMetric
-from flotorch_eval.agent_eval.metrics.langchain_metrics import TrajectoryEvalWithLLMMetric
-from flotorch_eval.agent_eval.metrics.ragas_metrics import (
-    AgentGoalAccuracyMetric,
-    ToolCallAccuracyMetric,
+from flotorch_eval.agent_eval.metrics.llm_evaluators import LLMBaseEval
+from flotorch_eval.agent_eval.metrics.llm_evaluators import (
+    TrajectoryEvalWithLLM,
+    TrajectoryEvalWithLLMWithReference,
 )
 
 __all__ = [
-    "BaseMetric",
-    "Evaluator",
+    "LLMBaseEval",
     "EvaluationResult",
     "Message",
     "MetricResult",
@@ -31,7 +28,6 @@ __all__ = [
     "ToolCall",
     "Trajectory",
     "TraceConverter",
-    "TrajectoryEvalWithLLMMetric",
-    "AgentGoalAccuracyMetric",
-    "ToolCallAccuracyMetric",
+    "TrajectoryEvalWithLLM",
+    "TrajectoryEvalWithLLMWithReference"
 ]

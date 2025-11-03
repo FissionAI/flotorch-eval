@@ -2,9 +2,6 @@ from opentel_utils import QueueSpanExporter
 from flotorch_eval.agent_eval.core.converter import TraceConverter
 import pandas as pd
 from IPython.display import display, HTML
-from flotorch_eval.agent_eval.metrics.base import BaseMetric
-from flotorch_eval.agent_eval.core.evaluator import Evaluator
-from flotorch_eval.agent_eval.metrics.base import MetricResult
 from typing import List, Any, Dict
 import textwrap
 import json
@@ -113,10 +110,6 @@ def display_evaluation_results(results: Any):
 
     display(styled_df)
     
-def initialize_evaluator(metrics: List[BaseMetric]) -> Evaluator:
-    """Initializes the Evaluator with a given list of metric objects."""
-    return Evaluator(metrics=metrics)
-
 
 def save_trajectory_to_json(trajectory: Trajectory, output_path: str | Path) -> None:
     """
