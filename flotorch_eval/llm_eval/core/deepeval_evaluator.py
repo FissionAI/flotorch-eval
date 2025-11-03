@@ -5,6 +5,7 @@ This module implements the DeepEval evaluator for LLM-based metrics.
 """
 
 import json
+from collections import defaultdict
 from typing import List, Dict, Any, Optional, Type, Union
 from pydantic import BaseModel
 from tenacity import (
@@ -284,6 +285,42 @@ class DeepEvalEvaluator(BaseEvaluator):
             for item in data
         ]
 
+    def _process_results(self, eval_results) -> Dict[str, float]:
+        """
+        Processes the raw DeepEval results to calculate average scores
+        for each metric across all test cases.
+
+        Args:
+            eval_results: EvaluationResult object from deepeval.evaluate().
+
+        Returns:
+            A dictionary mapping metric keys (from MetricKey enum) to their
+            average score.
+        """
+        deepeval_to_metric_key = {
+            "Contextual Relevancy": MetricKey.CONTEXT_RELEVANCY,
+            "Contextual Recall": MetricKey.CONTEXT_RECALL,
+            "Hallucination": MetricKey.HALLUCINATION,
+            "Faithfulness": MetricKey.FAITHFULNESS,
+            "Answer Relevancy": MetricKey.ANSWER_RELEVANCE,
+            "Context Precision": MetricKey.CONTEXT_PRECISION
+        }
+
+        metric_scores = defaultdict(list)
+
+        for test_result in eval_results.test_results:
+            for metric_data in test_result.metrics_data:
+                metric_key_enum = deepeval_to_metric_key.get(metric_data.name)
+                if metric_key_enum and metric_data.score is not None:
+                    metric_scores[metric_key_enum.value].append(metric_data.score)
+
+        averaged_results = {}
+        for metric_name, scores in metric_scores.items():
+            if scores:
+                averaged_results[metric_name] = round(sum(scores) / len(scores), 2)
+
+        return averaged_results
+
     def evaluate(
         self, data: List[EvaluationItem], metrics: Optional[List[str]] = None
     ) -> Dict[str, Any]:
@@ -299,4 +336,7 @@ class DeepEvalEvaluator(BaseEvaluator):
             metrics=selected_metrics + self.custom_metrics,
             error_config=ErrorConfig(ignore_errors=True),
         )
-        return eval_results.model_dump()
+        # Process results to get averaged scores
+        processed_results = self._process_results(eval_results)
+        return processed_results
+
