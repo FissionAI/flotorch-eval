@@ -256,6 +256,6 @@ class LLMEvaluator:
 
             # Merge gateway metrics into results
             if isinstance(results, dict):
-                results['gateway_metrics'] = gateway_results['gateway_metrics']
+                results.update(gateway_results['gateway_metrics'])
 
         return results
