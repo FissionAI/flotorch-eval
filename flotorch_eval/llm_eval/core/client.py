@@ -250,12 +250,16 @@ class LLMEvaluator:
             results = evaluator.evaluate(data, metrics_to_use)
 
         # Automatically include gateway metrics if metadata is present
+        gateway_metrics = None
         if GatewayMetrics.has_metadata(data):
             gateway_evaluator = GatewayEvaluator()
             gateway_results = gateway_evaluator.evaluate(data)
+            gateway_metrics = gateway_results.get('gateway_metrics', {})
 
-            # Merge gateway metrics into results
-            if isinstance(results, dict):
-                results.update(gateway_results['gateway_metrics'])
+        combined_results = {
+            "evaluation_metrics": results,          # all model evaluation scores
+        }
+        if gateway_metrics:
+            combined_results['gateway_metrics'] = gateway_metrics
 
-        return results
+        return combined_results
