@@ -65,8 +65,8 @@ class DeepEvalEvaluator(BaseEvaluator):
         api_key: str,
         base_url: str,
         custom_metrics: Optional[List[Any]] = None,
-        async_run: bool = False,
-        max_concurrent: int = 1,
+        async_run: bool = True,
+        max_concurrent: int = 5,
         metric_args: Optional[
             Dict[Union[str, MetricKey], Dict[str, Union[str, float, int]]]
         ] = None,
