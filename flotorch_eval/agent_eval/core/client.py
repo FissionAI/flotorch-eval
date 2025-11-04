@@ -20,7 +20,7 @@ from flotorch_eval.agent_eval.metrics.latency_metrics import LatencyMetric
 from flotorch_eval.agent_eval.metrics.base import MetricConfig
 
 
-class FlotorchEvalClient:
+class AgentEvaluator:
     """
     Client for evaluating agent trajectories using a set of metrics.
     Handles both synchronous and asynchronous (LLM-based) metrics.
@@ -28,7 +28,7 @@ class FlotorchEvalClient:
 
     def __init__(self, api_key, base_url, default_evaluator=None) -> None:
         """
-        Initialize the FlotorchEvalClient.
+        Initialize the AgentEvaluator.
 
         Args:
             api_key (str): API key for authentication.
