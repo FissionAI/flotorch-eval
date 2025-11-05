@@ -29,6 +29,9 @@ Install the base package:
 ```bash
 pip install flotorch-eval
 
+# With llm evaluation support:
+pip install "flotorch-eval[llm]"
+
 # With agent evaluation support:
 pip install "flotorch-eval[agent]"
 
@@ -80,8 +83,14 @@ results = evaluator.evaluate(
 
 print(results)
 ```
+Passing the metrics is optional. If metrics are not provided, data will be evaluated on all the available metrics from both the evaluation engines.
+The supported evaluation engines and metrics are given further below as you scroll down.
 
+Note: Aspect critique requires a configuration to be passed as a metric configuration to the LLMEvaluation for it to work and so it will not be be added as default. The configuration structure will be further below as you scroll down.
 ### Advanced LLM Evaluation with Custom Thresholds
+
+Deepeval metrics can be configured with specific threshold values which directly affects the score. 
+The default score is 0.7.
 
 ```python
 # Configure metric-specific arguments
@@ -109,6 +118,7 @@ results = evaluator.evaluate(data=data)
 
 ### Engine Selection Modes
 
+Flotorch currently supports two evaluation backend engines: Ragas and Deepeval. Each offers distinct as well as overlapping metrics, and you can choose how you want to run them.
 FlotorchEval supports flexible engine selection for LLM evaluation:
 
 #### Auto Mode (Default - Recommended)
