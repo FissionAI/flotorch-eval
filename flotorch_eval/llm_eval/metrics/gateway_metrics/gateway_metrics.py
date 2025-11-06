@@ -32,6 +32,7 @@ class GatewayMetrics:
                 'total_latency_ms': Total latency across all items,
                 'average_latency_ms': Average latency per item,
                 'total_cost': Total cost across all items,
+                'average_cost': Average cost per item,
                 'total_tokens': Total tokens used across all items,
                 'items_with_metadata': Number of items that had metadata,
                 'total_items': Total number of items
@@ -58,15 +59,15 @@ class GatewayMetrics:
                 if 'x-total-tokens' in item.metadata:
                     total_tokens += int(item.metadata['x-total-tokens'])
 
-        # Calculate average latency
+        # Calculate averages
         average_latency = total_latency / items_with_metadata if items_with_metadata > 0 else 0.0
-
-        # round all values to 4 decimal places
+        average_cost = total_cost / items_with_metadata if items_with_metadata > 0 else 0.0
 
         return {
             'total_latency_ms': round(total_latency, 4),
             'average_latency_ms': round(average_latency, 4),
             'total_cost': round(total_cost, 6),
+            'average_cost': round(average_cost, 6),
             'total_tokens': total_tokens,
             'items_with_metadata': items_with_metadata,
             'total_items': len(data)
