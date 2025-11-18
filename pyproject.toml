@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flotorch-eval"
-version = "1.1.0b1"
+version = "1.1.0"
 description = "A comprehensive evaluation framework for AI systems"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -26,19 +26,15 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0.0",
     "typing-extensions>=4.7.0",
-    "flotorch>=2.0.0"
+    "flotorch>=2.0.0",
+    "ragas==0.3.8",
+    "deepeval==3.6.9",
+    "opentelemetry-api>=1.0.0",
+    "opentelemetry-sdk>=1.0.0",
+    "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]
-llm = [
-    "ragas>=0.3.8",
-    "deepeval>=3.6.9"
-]
-agent = [
-    "opentelemetry-api>=1.0.0",
-    "opentelemetry-sdk>=1.0.0",
-    "requests>=2.28.0"
-]
 dev = [
     "pytest>=7.0.0",
     "black>=22.0.0",
@@ -48,7 +44,6 @@ dev = [
     "pytest-asyncio>=0.14.0",
     "pytest-cov>=2.0.0",
 ]
-all = ["flotorch-eval[llm,agent,dev]"]
 
 [tool.black]
 line-length = 88

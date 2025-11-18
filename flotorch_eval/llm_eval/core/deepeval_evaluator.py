@@ -303,7 +303,7 @@ class DeepEvalEvaluator(BaseEvaluator):
             "Hallucination": MetricKey.HALLUCINATION,
             "Faithfulness": MetricKey.FAITHFULNESS,
             "Answer Relevancy": MetricKey.ANSWER_RELEVANCE,
-            "Context Precision": MetricKey.CONTEXT_PRECISION
+            "Contextual Precision": MetricKey.CONTEXT_PRECISION
         }
 
         metric_scores = defaultdict(list)
