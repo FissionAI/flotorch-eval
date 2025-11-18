@@ -24,22 +24,13 @@
 
 ## 🧰 Installation
 
-Install the base package:
+Install the package:
 
 ```bash
 pip install flotorch-eval
 
-# With llm evaluation support:
-pip install "flotorch-eval[llm]"
-
-# With agent evaluation support:
-pip install "flotorch-eval[agent]"
-
 # With development tools:
 pip install "flotorch-eval[dev]"
-
-# Install everything:
-pip install "flotorch-eval[all]"
 ```
 
 ---
@@ -192,13 +183,13 @@ When using `auto` mode, metrics are routed based on priority:
 
 ### Agent Evaluation
 
-Evaluate agent trajectories using the FlotorchEvalClient:
+Evaluate agent trajectories using the AgentEvaluator:
 
 ```python
-from flotorch_eval.agent_eval.core.client import FlotorchEvalClient
+from flotorch_eval.agent_eval import AgentEvaluator
 
 # Initialize the evaluation client
-client = FlotorchEvalClient(
+client = AgentEvaluator(
     api_key="your-api-key",
     base_url="flotorch-base-url",
     default_evaluator="flotorch/inference_model"  # Default LLM for metrics requiring evaluation
